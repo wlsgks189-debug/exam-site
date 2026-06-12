@@ -106,6 +106,17 @@ tr:last-child td{border-bottom:none;}
 .pwa-banner{background:linear-gradient(135deg,#4f7cff18,#7c5cfc18);border:1px solid var(--accent);border-radius:12px;padding:1rem 1.2rem;display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem;gap:1rem;}
 .pwa-banner-text strong{display:block;margin-bottom:.2rem;font-size:.86rem;}
 .pwa-banner-text span{color:var(--text-muted);font-size:.76rem;}
+
+.todo-item{display:flex;align-items:center;gap:.8rem;padding:.7rem .8rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:.5rem;transition:all .2s;}
+.todo-item.done{opacity:.5;}
+.todo-item.done .todo-text{text-decoration:line-through;color:var(--text-muted);}
+.todo-check{width:18px;height:18px;accent-color:var(--success);cursor:pointer;flex-shrink:0;}
+.todo-text{flex:1;font-size:.88rem;}
+.todo-date-badge{font-size:.7rem;color:var(--text-muted);background:var(--surface);padding:1px 7px;border-radius:10px;border:1px solid var(--border);white-space:nowrap;}
+.done-group{margin-bottom:1rem;}
+.done-group-date{font-size:.8rem;font-weight:600;color:var(--accent);margin-bottom:.5rem;padding:.3rem 0;border-bottom:1px solid var(--border);}
+#done-history{display:none;}
+
 .empty{text-align:center;padding:2rem;color:var(--text-muted);font-size:.86rem;}
 .toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:var(--success);color:white;padding:.7rem 1.5rem;border-radius:20px;font-size:.84rem;font-weight:500;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;}
 .toast.show{opacity:1;}
@@ -251,6 +262,45 @@ tr:last-child td{border-bottom:none;}
         <div id="template-list"></div>
       </div>
 
+
+      <!-- 할일 -->
+      <div id="tab-todo" class="tab-content" style="display:none">
+        <div class="section-title">오늘 할일</div>
+        <div class="section-sub">체크한 항목은 완료 목록에 누적됩니다</div>
+
+        <!-- 날짜 선택 -->
+        <div class="card" style="margin-bottom:1rem">
+          <div style="display:flex;gap:.6rem;align-items:flex-end;flex-wrap:wrap">
+            <div class="form-group" style="flex:1;min-width:120px;margin:0">
+              <label>날짜</label>
+              <input type="date" id="todo-date">
+            </div>
+            <div class="form-group" style="flex:2;min-width:200px;margin:0">
+              <label>할일 입력</label>
+              <input type="text" id="todo-input" placeholder="할일을 입력하세요" onkeydown="if(event.key==='Enter')addTodo()">
+            </div>
+            <button class="btn btn-primary" style="width:auto;margin:0" onclick="addTodo()">추가</button>
+          </div>
+        </div>
+
+        <!-- 오늘 할일 목록 -->
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <h2 style="margin:0" id="todo-date-label">오늘 할일</h2>
+            <button class="btn btn-danger btn-sm" onclick="clearDoneTodos()">완료 항목 삭제</button>
+          </div>
+          <div id="todo-list"></div>
+        </div>
+
+        <!-- 누적 완료 목록 -->
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <h2 style="margin:0">✅ 완료 누적 목록</h2>
+            <button class="btn btn-outline btn-sm" onclick="toggleDoneHistory()">펼치기/접기</button>
+          </div>
+          <div id="done-history"></div>
+        </div>
+      </div>
       <!-- 사용자 관리 -->
       <div id="tab-users" class="tab-content" style="display:none">
         <div class="card"><h2>👥 사용자 관리</h2><div id="user-list"></div></div>
@@ -344,7 +394,7 @@ async function loadUser(user) {
   const badge=document.getElementById('nav-badge');
   badge.textContent=label; badge.className='badge '+cls;
   if(currentRole==='pending'){showPage('pending');}
-  else{showPage('main');setupMainTabs();loadFiles();renderTemplates();if(currentRole==='admin'){loadUsers();requestPush();}}
+  else{showPage('main');setupMainTabs();loadFiles();renderTemplates();initTodo();if(currentRole==='admin'){loadUsers();requestPush();}}
 }
 
 // ===== TABS =====
@@ -354,6 +404,7 @@ function setupMainTabs() {
     {id:'files',label:'📁 자료실'},
     ...(isAdmin?[{id:'upload',label:'📤 업로드'}]:[]),
     {id:'templates',label:'📋 민원 템플릿'},
+    {id:'todo',label:'✅ 할일'},
     ...(isAdmin?[{id:'users',label:'👥 사용자'}]:[]),
   ];
   document.getElementById('main-tabs').innerHTML=tabs.map((t,i)=>
@@ -693,6 +744,131 @@ async function loadUsers(){
   el.innerHTML=`<table><thead><tr><th>이메일</th><th>역할</th><th>관리</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 async function setRole(userId,role){await sb.from('profiles').update({role}).eq('id',userId);loadUsers();}
+
+
+// ===== TODO =====
+let todos = JSON.parse(localStorage.getItem('todos') || '[]');
+
+function saveTodos() { localStorage.setItem('todos', JSON.stringify(todos)); }
+
+function initTodo() {
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth()+1).padStart(2,'0');
+  const dd = String(today.getDate()).padStart(2,'0');
+  document.getElementById('todo-date').value = `${yyyy}-${mm}-${dd}`;
+  renderTodos();
+}
+
+function addTodo() {
+  const input = document.getElementById('todo-input');
+  const date = document.getElementById('todo-date').value;
+  const text = input.value.trim();
+  if (!text) return;
+  todos.push({
+    id: Date.now(),
+    text, date,
+    done: false,
+    doneAt: null
+  });
+  saveTodos();
+  input.value = '';
+  renderTodos();
+  showToast('✅ 할일 추가됐어요!');
+}
+
+function toggleTodo(id) {
+  const todo = todos.find(t => t.id === id);
+  if (!todo) return;
+  todo.done = !todo.done;
+  todo.doneAt = todo.done ? new Date().toISOString() : null;
+  saveTodos();
+  renderTodos();
+}
+
+function deleteTodo(id) {
+  todos = todos.filter(t => t.id !== id);
+  saveTodos();
+  renderTodos();
+}
+
+function clearDoneTodos() {
+  if (!confirm('완료된 항목을 삭제할까요?')) return;
+  todos = todos.filter(t => !t.done);
+  saveTodos();
+  renderTodos();
+}
+
+function renderTodos() {
+  const dateVal = document.getElementById('todo-date')?.value;
+  if (!dateVal) return;
+
+  // 날짜 레이블
+  const [y,m,d] = dateVal.split('-');
+  const days = ['일','월','화','수','목','금','토'];
+  const dow = days[new Date(dateVal).getDay()];
+  document.getElementById('todo-date-label').textContent = `${y}년 ${m}월 ${d}일 (${dow}) 할일`;
+
+  // 선택 날짜의 할일
+  const dayTodos = todos.filter(t => t.date === dateVal);
+  const el = document.getElementById('todo-list');
+
+  if (!dayTodos.length) {
+    el.innerHTML = '<div class="empty">할일이 없습니다. 위에서 추가해보세요!</div>';
+  } else {
+    el.innerHTML = dayTodos.map(t => `
+      <div class="todo-item ${t.done ? 'done' : ''}">
+        <input type="checkbox" class="todo-check" ${t.done ? 'checked' : ''} onchange="toggleTodo(${t.id})">
+        <span class="todo-text">${t.text}</span>
+        <button class="btn btn-danger btn-sm" onclick="deleteTodo(${t.id})" style="padding:.2rem .5rem;font-size:.75rem">🗑</button>
+      </div>
+    `).join('');
+  }
+
+  // 완료 누적 목록
+  renderDoneHistory();
+}
+
+function renderDoneHistory() {
+  const doneTodos = todos.filter(t => t.done).sort((a,b) => new Date(b.doneAt) - new Date(a.doneAt));
+  const el = document.getElementById('done-history');
+  if (!doneTodos.length) {
+    el.innerHTML = '<div class="empty">완료된 할일이 없습니다</div>';
+    return;
+  }
+
+  // 날짜별 그룹
+  const groups = {};
+  doneTodos.forEach(t => {
+    const d = t.date;
+    if (!groups[d]) groups[d] = [];
+    groups[d].push(t);
+  });
+
+  const days = ['일','월','화','수','목','금','토'];
+  el.innerHTML = Object.entries(groups)
+    .sort(([a],[b]) => b.localeCompare(a))
+    .map(([date, items]) => {
+      const [y,m,d] = date.split('-');
+      const dow = days[new Date(date).getDay()];
+      const itemsHTML = items.map(t => `
+        <div class="todo-item done">
+          <input type="checkbox" class="todo-check" checked onchange="toggleTodo(${t.id})">
+          <span class="todo-text">${t.text}</span>
+          <button class="btn btn-danger btn-sm" onclick="deleteTodo(${t.id})" style="padding:.2rem .5rem;font-size:.75rem">🗑</button>
+        </div>
+      `).join('');
+      return `<div class="done-group">
+        <div class="done-group-date">📅 ${y}년 ${m}월 ${d}일 (${dow})</div>
+        ${itemsHTML}
+      </div>`;
+    }).join('');
+}
+
+function toggleDoneHistory() {
+  const el = document.getElementById('done-history');
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
 
 // ===== UTILS =====
 function showAlert(elId,msg,type){const el=document.getElementById(elId);if(el){el.innerHTML=`<div class="alert alert-${type}">${msg}</div>`;setTimeout(()=>{if(el)el.innerHTML='';},4000);}}
