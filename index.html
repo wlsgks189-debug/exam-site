@@ -570,7 +570,7 @@ async function shareMultiple() {
       if(data) files.push(new File([data],name,{type:'application/zip'}));
     }
     if(navigator.share&&navigator.canShare&&navigator.canShare({files})){
-      await navigator.share({files,title:'시험 자료'});
+      await navigator.share({files});
     } else showToast('⚠️ 다중 파일 공유를 지원하지 않습니다');
   } catch(e){if(e.name!=='AbortError')showToast('공유 실패');}
   clearSelection();
@@ -593,10 +593,11 @@ async function shareFile(name) {
     if(!data) return;
     const file=new File([data],name,{type:'application/zip'});
     if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
-      await navigator.share({files:[file],title:name});
-    } else if(navigator.share){
-      await navigator.share({title:name,url:window.location.href});
-    } else downloadFile(name);
+      await navigator.share({files:[file]});
+    } else {
+      // 파일 공유 불가능하면 그냥 다운로드
+      downloadFile(name);
+    }
   } catch(e){if(e.name!=='AbortError')downloadFile(name);}
 }
 
