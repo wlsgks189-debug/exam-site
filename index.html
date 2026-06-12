@@ -4,17 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>시험문제 자료실</title>
-
-<!-- PWA 메타태그 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="시험자료실">
 <meta name="theme-color" content="#0f1117">
 <link rel="manifest" href="manifest.json">
-
-<!-- PWA 아이콘 -->
-<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%234f7cff'/><text y='.9em' font-size='80' x='10'>📋</text></svg>">
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
@@ -34,177 +28,101 @@
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    font-family: 'Noto Sans KR', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-  }
+  body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
   nav {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 0 1.5rem;
-    height: 60px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    position: sticky;
-    top: 0;
-    z-index: 100;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 0 1.5rem; height: 60px; display: flex; align-items: center;
+    justify-content: space-between; position: sticky; top: 0; z-index: 100;
   }
-
-  .nav-logo {
-    font-size: 1.1rem;
-    font-weight: 700;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-
-  .nav-right {
-    display: flex;
-    align-items: center;
-    gap: 0.7rem;
-  }
-
+  .nav-logo { font-size: 1.1rem; font-weight: 700; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .nav-right { display: flex; align-items: center; gap: 0.7rem; }
   .nav-user { font-size: 0.78rem; color: var(--text-muted); }
 
-  .badge {
-    font-size: 0.7rem;
-    padding: 2px 8px;
-    border-radius: 20px;
-    font-weight: 500;
-  }
+  .badge { font-size: 0.7rem; padding: 2px 8px; border-radius: 20px; font-weight: 500; }
   .badge-admin { background: #4f7cff22; color: var(--accent); border: 1px solid var(--accent); }
   .badge-supervisor { background: #7c5cfc22; color: var(--accent2); border: 1px solid var(--accent2); }
   .badge-pending { background: #f0a04022; color: var(--warning); border: 1px solid var(--warning); }
 
   .container { max-width: 900px; margin: 0 auto; padding: 1.5rem 1rem; }
 
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 1.5rem;
-    margin-bottom: 1.2rem;
-  }
-
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.2rem; }
   .card h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 1.2rem; }
 
   .form-group { margin-bottom: 1rem; }
-
   label { display: block; font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.4rem; font-weight: 500; }
 
-  input {
-    width: 100%;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 0.7rem 1rem;
-    color: var(--text);
-    font-size: 0.9rem;
-    font-family: inherit;
-    transition: border-color 0.2s;
+  input, select {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 0.7rem 1rem; color: var(--text);
+    font-size: 0.9rem; font-family: inherit; transition: border-color 0.2s;
   }
-  input:focus { outline: none; border-color: var(--accent); }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  select option { background: var(--surface2); }
+
+  .form-row { display: flex; gap: 0.7rem; }
+  .form-row .form-group { flex: 1; }
 
   .btn {
-    padding: 0.7rem 1.2rem;
-    border-radius: 8px;
-    font-size: 0.88rem;
-    font-weight: 500;
-    font-family: inherit;
-    cursor: pointer;
-    border: none;
-    transition: all 0.2s;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
+    padding: 0.7rem 1.2rem; border-radius: 8px; font-size: 0.88rem;
+    font-weight: 500; font-family: inherit; cursor: pointer; border: none;
+    transition: all 0.2s; display: inline-flex; align-items: center; gap: 0.4rem;
   }
-
-  .btn-primary {
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    color: white;
-    width: 100%;
-    justify-content: center;
-    margin-top: 0.5rem;
-  }
+  .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: white; width: 100%; justify-content: center; margin-top: 0.5rem; }
   .btn-primary:hover { opacity: 0.9; }
-
   .btn-sm { padding: 0.35rem 0.8rem; font-size: 0.78rem; border-radius: 6px; }
-
-  .btn-outline {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--text-muted);
-  }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-muted); }
   .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
-
   .btn-danger { background: #f05e5e22; border: 1px solid var(--danger); color: var(--danger); }
   .btn-success { background: #4caf8a22; border: 1px solid var(--success); color: var(--success); }
   .btn-share { background: #fee50022; border: 1px solid #fee500; color: #fee500; }
 
   .tabs { display: flex; gap: 0.5rem; margin-bottom: 1.2rem; border-bottom: 1px solid var(--border); }
-  .tab {
-    padding: 0.6rem 1rem;
-    font-size: 0.88rem;
-    cursor: pointer;
-    border: none;
-    background: none;
-    color: var(--text-muted);
-    font-family: inherit;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -1px;
-    transition: all 0.2s;
-  }
+  .tab { padding: 0.6rem 1rem; font-size: 0.88rem; cursor: pointer; border: none; background: none; color: var(--text-muted); font-family: inherit; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.2s; }
   .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 
+  /* 날짜 그룹 */
+  .date-group { margin-bottom: 1.5rem; }
+  .date-group-header {
+    display: flex; align-items: center; gap: 0.8rem;
+    padding: 0.7rem 1rem; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 10px 10px 0 0;
+    border-bottom: none;
+  }
+  .date-group-title { font-size: 1rem; font-weight: 600; flex: 1; }
+  .exam-type-badge {
+    font-size: 0.72rem; padding: 3px 10px; border-radius: 20px; font-weight: 600;
+  }
+  .type-regular { background: #4f7cff22; color: var(--accent); border: 1px solid var(--accent); }
+  .type-group { background: #4caf8a22; color: var(--success); border: 1px solid var(--success); }
+
   .file-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.9rem 1rem;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    margin-bottom: 0.7rem;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.9rem 1rem; background: var(--surface);
+    border: 1px solid var(--border); border-top: none;
     gap: 0.5rem;
   }
+  .date-group .file-item:last-child { border-radius: 0 0 10px 10px; }
 
   .file-info { display: flex; align-items: center; gap: 0.8rem; flex: 1; min-width: 0; }
-
-  .file-icon {
-    width: 36px; height: 36px;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1rem; flex-shrink: 0;
-  }
-
-  .file-name { font-size: 0.88rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .file-size { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
-
+  .file-icon { width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; flex-shrink: 0; }
+  .file-name { font-size: 0.85rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-size { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
   .file-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
+
+  /* 업로드 폼 */
+  .upload-area {
+    border: 2px dashed var(--border); border-radius: 10px; padding: 1.5rem;
+    text-align: center; cursor: pointer; transition: all 0.2s; margin-bottom: 1rem;
+  }
+  .upload-area:hover, .upload-area.drag-over { border-color: var(--accent); background: #4f7cff08; }
+  .upload-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+  .upload-text { font-size: 0.88rem; color: var(--text-muted); }
 
   table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
   th { text-align: left; padding: 0.7rem 0.8rem; color: var(--text-muted); font-weight: 500; border-bottom: 1px solid var(--border); }
   td { padding: 0.8rem 0.8rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
   tr:last-child td { border-bottom: none; }
-
-  .upload-area {
-    border: 2px dashed var(--border);
-    border-radius: 10px;
-    padding: 1.5rem;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.2s;
-    margin-bottom: 1rem;
-  }
-  .upload-area:hover, .upload-area.drag-over { border-color: var(--accent); background: #4f7cff08; }
-  .upload-icon { font-size: 2rem; margin-bottom: 0.5rem; }
-  .upload-text { font-size: 0.88rem; color: var(--text-muted); }
 
   .alert { padding: 0.8rem 1rem; border-radius: 8px; font-size: 0.85rem; margin-bottom: 1rem; }
   .alert-error { background: #f05e5e18; border: 1px solid var(--danger); color: var(--danger); }
@@ -220,27 +138,18 @@
   .progress-bar { height: 4px; background: var(--border); border-radius: 2px; margin-top: 0.5rem; overflow: hidden; }
   .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width 0.3s; }
 
-  /* PWA 설치 배너 */
   .pwa-banner {
-    background: linear-gradient(135deg, #4f7cff22, #7c5cfc22);
-    border: 1px solid var(--accent);
-    border-radius: 12px;
-    padding: 1rem 1.2rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 1.2rem;
-    gap: 1rem;
+    background: linear-gradient(135deg, #4f7cff22, #7c5cfc22); border: 1px solid var(--accent);
+    border-radius: 12px; padding: 1rem 1.2rem; display: flex; align-items: center;
+    justify-content: space-between; margin-bottom: 1.2rem; gap: 1rem;
   }
-  .pwa-banner-text { font-size: 0.85rem; }
-  .pwa-banner-text strong { display: block; margin-bottom: 0.2rem; }
+  .pwa-banner-text strong { display: block; margin-bottom: 0.2rem; font-size: 0.88rem; }
   .pwa-banner-text span { color: var(--text-muted); font-size: 0.78rem; }
 
   #app { display: none; }
 </style>
 </head>
 <body>
-
 <div id="app">
   <nav>
     <div class="nav-logo">📋 시험문제 자료실</div>
@@ -267,25 +176,13 @@
         </div>
         <div id="auth-alert"></div>
         <div id="tab-login">
-          <div class="form-group">
-            <label>이메일</label>
-            <input type="email" id="login-email" placeholder="example@email.com">
-          </div>
-          <div class="form-group">
-            <label>비밀번호</label>
-            <input type="password" id="login-pw" placeholder="비밀번호 입력" onkeydown="if(event.key==='Enter')doLogin()">
-          </div>
+          <div class="form-group"><label>이메일</label><input type="email" id="login-email" placeholder="example@email.com"></div>
+          <div class="form-group"><label>비밀번호</label><input type="password" id="login-pw" placeholder="비밀번호 입력" onkeydown="if(event.key==='Enter')doLogin()"></div>
           <button class="btn btn-primary" onclick="doLogin()">로그인</button>
         </div>
         <div id="tab-signup" style="display:none">
-          <div class="form-group">
-            <label>이메일</label>
-            <input type="email" id="signup-email" placeholder="example@email.com">
-          </div>
-          <div class="form-group">
-            <label>비밀번호</label>
-            <input type="password" id="signup-pw" placeholder="6자 이상">
-          </div>
+          <div class="form-group"><label>이메일</label><input type="email" id="signup-email" placeholder="example@email.com"></div>
+          <div class="form-group"><label>비밀번호</label><input type="password" id="signup-pw" placeholder="6자 이상"></div>
           <button class="btn btn-primary" onclick="doSignup()">회원가입</button>
         </div>
       </div>
@@ -312,12 +209,35 @@
     <div id="page-admin" style="display:none">
       <div class="section-title">관리자 페이지</div>
       <div class="section-sub">파일 업로드 및 사용자 관리</div>
-
       <div id="pwa-banner-admin"></div>
 
       <div class="card">
         <h2>📤 파일 업로드</h2>
         <div id="upload-alert"></div>
+
+        <!-- 날짜/종류 입력 -->
+        <div class="form-row">
+          <div class="form-group">
+            <label>년도</label>
+            <select id="upload-year"></select>
+          </div>
+          <div class="form-group">
+            <label>월</label>
+            <select id="upload-month"></select>
+          </div>
+          <div class="form-group">
+            <label>일</label>
+            <select id="upload-day"></select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>검정 종류</label>
+          <select id="upload-type">
+            <option value="정기">정기</option>
+            <option value="단체">단체</option>
+          </select>
+        </div>
+
         <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
           <div class="upload-icon">📦</div>
           <div class="upload-text">ZIP 파일을 클릭하거나 드래그해서 업로드</div>
@@ -353,7 +273,51 @@ const ADMIN_EMAIL = 'wlsgks189@gmail.com';
 let currentUser = null;
 let deferredPrompt = null;
 
-// PWA 설치 이벤트 감지
+// 날짜 셀렉트 초기화
+function initDateSelects() {
+  const now = new Date();
+  const yearEl = document.getElementById('upload-year');
+  const monthEl = document.getElementById('upload-month');
+  const dayEl = document.getElementById('upload-day');
+
+  for (let y = now.getFullYear(); y >= now.getFullYear() - 2; y--) {
+    yearEl.innerHTML += `<option value="${y}" ${y===now.getFullYear()?'selected':''}>${y}년</option>`;
+  }
+  for (let m = 1; m <= 12; m++) {
+    monthEl.innerHTML += `<option value="${String(m).padStart(2,'0')}" ${m===now.getMonth()+1?'selected':''}>${String(m).padStart(2,'0')}월</option>`;
+  }
+  for (let d = 1; d <= 31; d++) {
+    dayEl.innerHTML += `<option value="${String(d).padStart(2,'0')}" ${d===now.getDate()?'selected':''}>${String(d).padStart(2,'0')}일</option>`;
+  }
+}
+
+// 파일명에서 날짜/타입 파싱
+// 형식: YYYY-MM-DD_정기_원본파일명.zip
+function parseFileName(name) {
+  const match = name.match(/^(\d{4})-(\d{2})-(\d{2})_(정기|단체)_(.+)$/);
+  if (match) {
+    return {
+      year: match[1], month: match[2], day: match[3],
+      type: match[4], original: match[5],
+      label: `${match[1]}년 ${match[2]}월 ${match[3]}일 (${match[4]})`
+    };
+  }
+  return null;
+}
+
+function groupFilesByDate(files) {
+  const groups = {};
+  files.forEach(f => {
+    const info = parseFileName(f.name);
+    if (!info) return;
+    const key = `${info.year}-${info.month}-${info.day}_${info.type}`;
+    if (!groups[key]) groups[key] = { info, files: [] };
+    groups[key].files.push({ ...f, info });
+  });
+  return Object.values(groups).sort((a, b) => b.info.year+b.info.month+b.info.day > a.info.year+a.info.month+a.info.day ? 1 : -1);
+}
+
+// PWA
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
@@ -364,7 +328,6 @@ function showPWABanner() {
   const isIOS = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
   if (isStandalone) return;
-
   const bannerHTML = isIOS ? `
     <div class="pwa-banner">
       <div class="pwa-banner-text">
@@ -379,9 +342,10 @@ function showPWABanner() {
       </div>
       <button class="btn btn-outline btn-sm" onclick="installPWA()">설치</button>
     </div>`;
-
-  document.getElementById('pwa-banner-admin').innerHTML = bannerHTML;
-  document.getElementById('pwa-banner-supervisor').innerHTML = bannerHTML;
+  ['pwa-banner-admin','pwa-banner-supervisor'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = bannerHTML;
+  });
 }
 
 async function installPWA() {
@@ -392,11 +356,11 @@ async function installPWA() {
 }
 
 async function init() {
+  initDateSelects();
   const { data: { session } } = await sb.auth.getSession();
   if (session) await loadUser(session.user);
   document.getElementById('app').style.display = 'block';
   showPWABanner();
-
   sb.auth.onAuthStateChange(async (event, session) => {
     if (session) await loadUser(session.user);
     else showPage('auth');
@@ -407,30 +371,25 @@ async function loadUser(user) {
   currentUser = user;
   const { data: profile } = await sb.from('profiles').select('*').eq('id', user.id).single();
   const role = user.email === ADMIN_EMAIL ? 'admin' : (profile?.role || 'pending');
-
   document.getElementById('nav-email').textContent = user.email;
-  const badges = { admin: ['관리자', 'badge-admin'], supervisor: ['총감독관', 'badge-supervisor'], pending: ['승인대기', 'badge-pending'] };
+  const badges = { admin: ['관리자','badge-admin'], supervisor: ['총감독관','badge-supervisor'], pending: ['승인대기','badge-pending'] };
   const [label, cls] = badges[role] || badges.pending;
   const badge = document.getElementById('nav-badge');
-  badge.textContent = label;
-  badge.className = 'badge ' + cls;
-
+  badge.textContent = label; badge.className = 'badge ' + cls;
   if (role === 'admin') { showPage('admin'); loadAdminData(); }
   else if (role === 'supervisor') { showPage('supervisor'); loadSupervisorFiles(); }
   else showPage('pending');
 }
 
 function showPage(name) {
-  ['auth','pending','supervisor','admin'].forEach(p => {
-    document.getElementById('page-' + p).style.display = 'none';
-  });
-  document.getElementById('page-' + name).style.display = 'block';
+  ['auth','pending','supervisor','admin'].forEach(p => document.getElementById('page-'+p).style.display = 'none');
+  document.getElementById('page-'+name).style.display = 'block';
 }
 
 function switchTab(tab) {
-  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', (tab==='login'&&i===0)||(tab==='signup'&&i===1)));
-  document.getElementById('tab-login').style.display = tab === 'login' ? 'block' : 'none';
-  document.getElementById('tab-signup').style.display = tab === 'signup' ? 'block' : 'none';
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active',(tab==='login'&&i===0)||(tab==='signup'&&i===1)));
+  document.getElementById('tab-login').style.display = tab==='login'?'block':'none';
+  document.getElementById('tab-signup').style.display = tab==='signup'?'block':'none';
   document.getElementById('auth-alert').innerHTML = '';
 }
 
@@ -456,84 +415,76 @@ async function logout() {
   document.getElementById('nav-badge').textContent = '';
 }
 
+function renderFileGroups(groups, isAdmin) {
+  if (groups.length === 0) return '<div style="text-align:center;padding:2rem;color:var(--text-muted)">업로드된 파일이 없습니다</div>';
+
+  return groups.map(g => {
+    const typeCls = g.info.type === '정기' ? 'type-regular' : 'type-group';
+    const filesHTML = g.files.map(f => `
+      <div class="file-item">
+        <div class="file-info">
+          <div class="file-icon">📦</div>
+          <div style="min-width:0">
+            <div class="file-name">${f.info.original}</div>
+            <div class="file-size">${formatSize(f.metadata?.size)}</div>
+          </div>
+        </div>
+        <div class="file-actions">
+          ${!isAdmin ? `<button class="btn btn-success btn-sm" onclick="downloadFile('${f.name}')">⬇ 다운로드</button>` : ''}
+          <button class="btn btn-share btn-sm" onclick="shareFile('${f.name}')">📤 공유</button>
+          ${isAdmin ? `<button class="btn btn-danger btn-sm" onclick="deleteFile('${f.name}')">🗑</button>` : ''}
+        </div>
+      </div>`).join('');
+
+    return `
+      <div class="date-group">
+        <div class="date-group-header">
+          <div class="date-group-title">📅 ${g.info.year}년 ${g.info.month}월 ${g.info.day}일</div>
+          <span class="exam-type-badge ${typeCls}">${g.info.type}</span>
+        </div>
+        ${filesHTML}
+      </div>`;
+  }).join('');
+}
+
 async function loadSupervisorFiles() {
   const { data } = await sb.storage.from('exam-zips').list('', { sortBy: { column: 'created_at', order: 'desc' } });
   const el = document.getElementById('file-list-supervisor');
-  if (!data || data.filter(f=>f.name.endsWith('.zip')).length === 0) {
-    el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-muted)">업로드된 파일이 없습니다</div>';
-    return;
-  }
-  el.innerHTML = data.filter(f => f.name.endsWith('.zip')).map(f => `
-    <div class="file-item">
-      <div class="file-info">
-        <div class="file-icon">📦</div>
-        <div style="min-width:0">
-          <div class="file-name">${f.name}</div>
-          <div class="file-size">${formatSize(f.metadata?.size)}</div>
-        </div>
-      </div>
-      <div class="file-actions">
-        <button class="btn btn-success btn-sm" onclick="downloadFile('${f.name}')">⬇ 다운로드</button>
-        <button class="btn btn-share btn-sm" onclick="shareFile('${f.name}')">공유</button>
-      </div>
-    </div>
-  `).join('');
+  const files = (data || []).filter(f => f.name.endsWith('.zip'));
+  const groups = groupFilesByDate(files);
+  el.innerHTML = renderFileGroups(groups, false);
 }
 
 async function loadAdminFiles() {
   const { data } = await sb.storage.from('exam-zips').list('', { sortBy: { column: 'created_at', order: 'desc' } });
   const el = document.getElementById('file-list-admin');
-  if (!data || data.filter(f=>f.name.endsWith('.zip')).length === 0) {
-    el.innerHTML = '<div style="text-align:center;padding:1rem;color:var(--text-muted)">업로드된 파일 없음</div>';
-    return;
-  }
-  el.innerHTML = data.filter(f => f.name.endsWith('.zip')).map(f => `
-    <div class="file-item">
-      <div class="file-info">
-        <div class="file-icon">📦</div>
-        <div style="min-width:0">
-          <div class="file-name">${f.name}</div>
-          <div class="file-size">${formatSize(f.metadata?.size)}</div>
-        </div>
-      </div>
-      <div class="file-actions">
-        <button class="btn btn-share btn-sm" onclick="shareFile('${f.name}')">공유</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteFile('${f.name}')">🗑</button>
-      </div>
-    </div>
-  `).join('');
+  const files = (data || []).filter(f => f.name.endsWith('.zip'));
+  const groups = groupFilesByDate(files);
+  el.innerHTML = renderFileGroups(groups, true);
 }
 
 async function downloadFile(name) {
   const { data } = await sb.storage.from('exam-zips').download(name);
   if (!data) return;
+  const info = parseFileName(name);
+  const fileName = info ? info.original : name;
   const url = URL.createObjectURL(data);
-  const a = document.createElement('a');
-  a.href = url; a.download = name; a.click();
+  const a = document.createElement('a'); a.href = url; a.download = fileName; a.click();
   URL.revokeObjectURL(url);
 }
 
 async function shareFile(name) {
   try {
-    // 파일 다운로드 후 공유
     const { data } = await sb.storage.from('exam-zips').download(name);
     if (!data) return;
-
-    const file = new File([data], name, { type: 'application/zip' });
-
-    // Web Share API로 파일 직접 공유 (아이폰 지원)
+    const info = parseFileName(name);
+    const fileName = info ? info.original : name;
+    const file = new File([data], fileName, { type: 'application/zip' });
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({
-        files: [file],
-        title: name,
-      });
+      await navigator.share({ files: [file], title: fileName });
     } else if (navigator.share) {
-      // 파일 공유 안되면 URL 공유
-      const url = URL.createObjectURL(data);
-      await navigator.share({ title: name, url: window.location.href });
-      URL.revokeObjectURL(url);
+      await navigator.share({ title: fileName, url: window.location.href });
     } else {
-      // 지원 안하면 그냥 다운로드
       downloadFile(name);
     }
   } catch (e) {
@@ -542,29 +493,33 @@ async function shareFile(name) {
 }
 
 async function deleteFile(name) {
-  if (!confirm(`"${name}" 을 삭제할까요?`)) return;
+  if (!confirm(`삭제할까요?`)) return;
   await sb.storage.from('exam-zips').remove([name]);
   loadAdminFiles();
 }
 
 async function uploadFile(file) {
   if (!file) return;
-  if (!file.name.endsWith('.zip')) {
-    showAlert('upload-alert', 'ZIP 파일만 업로드 가능합니다', 'error'); return;
-  }
+  if (!file.name.endsWith('.zip')) { showAlert('upload-alert', 'ZIP 파일만 업로드 가능합니다', 'error'); return; }
+
+  const year = document.getElementById('upload-year').value;
+  const month = document.getElementById('upload-month').value;
+  const day = document.getElementById('upload-day').value;
+  const type = document.getElementById('upload-type').value;
+
+  // 파일명: YYYY-MM-DD_정기_원본파일명.zip
+  const storageName = `${year}-${month}-${day}_${type}_${file.name}`;
+
   document.getElementById('upload-progress').style.display = 'block';
   document.getElementById('progress-fill').style.width = '30%';
 
-  const { error } = await sb.storage.from('exam-zips').upload(file.name, file, { upsert: true });
+  const { error } = await sb.storage.from('exam-zips').upload(storageName, file, { upsert: true });
   document.getElementById('progress-fill').style.width = '100%';
 
   if (error) showAlert('upload-alert', '업로드 실패: ' + error.message, 'error');
-  else { showAlert('upload-alert', '업로드 완료!', 'success'); loadAdminFiles(); }
+  else { showAlert('upload-alert', `✅ ${year}년 ${month}월 ${day}일 (${type}) 업로드 완료!`, 'success'); loadAdminFiles(); }
 
-  setTimeout(() => {
-    document.getElementById('upload-progress').style.display = 'none';
-    document.getElementById('progress-fill').style.width = '0%';
-  }, 1500);
+  setTimeout(() => { document.getElementById('upload-progress').style.display = 'none'; document.getElementById('progress-fill').style.width = '0%'; }, 1500);
 }
 
 const area = document.getElementById('upload-area');
@@ -577,15 +532,12 @@ if (area) {
 async function loadUsers() {
   const { data } = await sb.from('profiles').select('*').order('created_at', { ascending: false });
   const el = document.getElementById('user-list');
-  if (!data || data.length === 0) {
-    el.innerHTML = '<div style="text-align:center;padding:1rem;color:var(--text-muted)">가입한 사용자 없음</div>';
-    return;
-  }
+  if (!data || data.length === 0) { el.innerHTML = '<div style="text-align:center;padding:1rem;color:var(--text-muted)">가입한 사용자 없음</div>'; return; }
   const rows = data.map(u => {
     const isAdmin = u.email === ADMIN_EMAIL;
     const role = isAdmin ? 'admin' : u.role;
-    const roleLabel = { admin: '관리자', supervisor: '총감독관', pending: '대기중' }[role] || '대기중';
-    const badgeCls = { admin: 'badge-admin', supervisor: 'badge-supervisor', pending: 'badge-pending' }[role] || 'badge-pending';
+    const roleLabel = { admin:'관리자', supervisor:'총감독관', pending:'대기중' }[role] || '대기중';
+    const badgeCls = { admin:'badge-admin', supervisor:'badge-supervisor', pending:'badge-pending' }[role] || 'badge-pending';
     const btn = isAdmin ? '' : role === 'supervisor'
       ? `<button class="btn btn-outline btn-sm" onclick="setRole('${u.id}','pending')">권한 해제</button>`
       : `<button class="btn btn-success btn-sm" onclick="setRole('${u.id}','supervisor')">총감독관 지정</button>`;
@@ -615,12 +567,6 @@ function formatSize(bytes) {
 
 init();
 </script>
-
-<!-- Service Worker 등록 -->
-<script>
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js').catch(() => {});
-}
-</script>
+<script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(() => {}); }</script>
 </body>
 </html>
