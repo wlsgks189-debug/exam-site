@@ -577,8 +577,11 @@ async function deleteFile(name) {
 }
 
 function safeName(str) {
-  // 한글, 영문, 숫자, 일부 특수문자만 허용 / 나머지는 _로 치환
-  return str.replace(/[^\w가-힣ㄱ-ㅎㅏ-ㅣ\-_.()]/g, '_');
+  return str
+    .replace(/[()\[\]{}\s]/g, "_")
+    .replace(/[^\w\-_.]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
 }
 
 async function uploadFile(file) {
