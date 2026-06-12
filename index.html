@@ -576,6 +576,11 @@ async function deleteFile(name) {
   loadFiles();
 }
 
+function safeName(str) {
+  // 한글, 영문, 숫자, 일부 특수문자만 허용 / 나머지는 _로 치환
+  return str.replace(/[^\w가-힣ㄱ-ㅎㅏ-ㅣ\-_.()]/g, '_');
+}
+
 async function uploadFile(file) {
   if(!file) return;
   if(!file.name.endsWith('.zip')){showAlert('upload-alert','ZIP 파일만 업로드 가능합니다','error');return;}
@@ -584,8 +589,9 @@ async function uploadFile(file) {
   const day=document.getElementById('upload-day').value;
   const type=document.getElementById('upload-type').value;
   const memo=document.getElementById('upload-memo').value.trim();
-  const baseName=file.name.replace(/\.zip$/,'');
-  const storageName=memo?`${year}-${month}-${day}_${type}_${baseName}__memo__${memo}.zip`:`${year}-${month}-${day}_${type}_${file.name}`;
+  const baseName=safeName(file.name.replace(/\.zip$/,''));
+  const safeMemo=memo?safeName(memo):'';
+  const storageName=safeMemo?`${year}-${month}-${day}_${type}_${baseName}__memo__${safeMemo}.zip`:`${year}-${month}-${day}_${type}_${baseName}.zip`;
   document.getElementById('upload-progress').style.display='block';
   document.getElementById('progress-fill').style.width='40%';
   const {error}=await sb.storage.from('exam-zips').upload(storageName,file,{upsert:true});
