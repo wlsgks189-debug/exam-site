@@ -4,6 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>시험문제 자료실</title>
+
+<!-- PWA 메타태그 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="시험자료실">
+<meta name="theme-color" content="#0f1117">
+<link rel="manifest" href="manifest.json">
+
+<!-- PWA 아이콘 -->
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%234f7cff'/><text y='.9em' font-size='80' x='10'>📋</text></svg>">
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
@@ -31,11 +42,10 @@
     min-height: 100vh;
   }
 
-  /* NAV */
   nav {
     background: var(--surface);
     border-bottom: 1px solid var(--border);
-    padding: 0 2rem;
+    padding: 0 1.5rem;
     height: 60px;
     display: flex;
     align-items: center;
@@ -51,19 +61,15 @@
     background: linear-gradient(135deg, var(--accent), var(--accent2));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    letter-spacing: -0.5px;
   }
 
   .nav-right {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 0.7rem;
   }
 
-  .nav-user {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-  }
+  .nav-user { font-size: 0.78rem; color: var(--text-muted); }
 
   .badge {
     font-size: 0.7rem;
@@ -75,40 +81,21 @@
   .badge-supervisor { background: #7c5cfc22; color: var(--accent2); border: 1px solid var(--accent2); }
   .badge-pending { background: #f0a04022; color: var(--warning); border: 1px solid var(--warning); }
 
-  /* LAYOUT */
-  .container {
-    max-width: 900px;
-    margin: 0 auto;
-    padding: 2rem 1.5rem;
-  }
+  .container { max-width: 900px; margin: 0 auto; padding: 1.5rem 1rem; }
 
-  /* CARDS */
   .card {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 12px;
-    padding: 2rem;
+    padding: 1.5rem;
+    margin-bottom: 1.2rem;
   }
 
-  .card h2 {
-    font-size: 1.2rem;
-    font-weight: 600;
-    margin-bottom: 1.5rem;
-    color: var(--text);
-  }
+  .card h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 1.2rem; }
 
-  /* FORMS */
-  .form-group {
-    margin-bottom: 1rem;
-  }
+  .form-group { margin-bottom: 1rem; }
 
-  label {
-    display: block;
-    font-size: 0.82rem;
-    color: var(--text-muted);
-    margin-bottom: 0.4rem;
-    font-weight: 500;
-  }
+  label { display: block; font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.4rem; font-weight: 500; }
 
   input {
     width: 100%;
@@ -121,37 +108,32 @@
     font-family: inherit;
     transition: border-color 0.2s;
   }
+  input:focus { outline: none; border-color: var(--accent); }
 
-  input:focus {
-    outline: none;
-    border-color: var(--accent);
-  }
-
-  /* BUTTONS */
   .btn {
-    padding: 0.7rem 1.5rem;
+    padding: 0.7rem 1.2rem;
     border-radius: 8px;
-    font-size: 0.9rem;
+    font-size: 0.88rem;
     font-weight: 500;
     font-family: inherit;
     cursor: pointer;
     border: none;
     transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
   }
 
   .btn-primary {
     background: linear-gradient(135deg, var(--accent), var(--accent2));
     color: white;
     width: 100%;
+    justify-content: center;
     margin-top: 0.5rem;
   }
-  .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn-primary:hover { opacity: 0.9; }
 
-  .btn-sm {
-    padding: 0.35rem 0.9rem;
-    font-size: 0.78rem;
-    border-radius: 6px;
-  }
+  .btn-sm { padding: 0.35rem 0.8rem; font-size: 0.78rem; border-radius: 6px; }
 
   .btn-outline {
     background: transparent;
@@ -160,29 +142,13 @@
   }
   .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
 
-  .btn-danger {
-    background: #f05e5e22;
-    border: 1px solid var(--danger);
-    color: var(--danger);
-  }
+  .btn-danger { background: #f05e5e22; border: 1px solid var(--danger); color: var(--danger); }
+  .btn-success { background: #4caf8a22; border: 1px solid var(--success); color: var(--success); }
+  .btn-share { background: #fee50022; border: 1px solid #fee500; color: #fee500; }
 
-  .btn-success {
-    background: #4caf8a22;
-    border: 1px solid var(--success);
-    color: var(--success);
-  }
-
-  /* TABS */
-  .tabs {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1.5rem;
-    border-bottom: 1px solid var(--border);
-    padding-bottom: 0;
-  }
-
+  .tabs { display: flex; gap: 0.5rem; margin-bottom: 1.2rem; border-bottom: 1px solid var(--border); }
   .tab {
-    padding: 0.6rem 1.2rem;
+    padding: 0.6rem 1rem;
     font-size: 0.88rem;
     cursor: pointer;
     border: none;
@@ -193,146 +159,82 @@
     margin-bottom: -1px;
     transition: all 0.2s;
   }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 
-  .tab.active {
-    color: var(--accent);
-    border-bottom-color: var(--accent);
-  }
-
-  /* FILE LIST */
   .file-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 1rem 1.2rem;
+    padding: 0.9rem 1rem;
     background: var(--surface2);
     border: 1px solid var(--border);
     border-radius: 10px;
     margin-bottom: 0.7rem;
-    transition: border-color 0.2s;
+    gap: 0.5rem;
   }
 
-  .file-item:hover { border-color: var(--accent); }
-
-  .file-info {
-    display: flex;
-    align-items: center;
-    gap: 0.8rem;
-  }
+  .file-info { display: flex; align-items: center; gap: 0.8rem; flex: 1; min-width: 0; }
 
   .file-icon {
-    width: 36px;
-    height: 36px;
+    width: 36px; height: 36px;
     background: linear-gradient(135deg, var(--accent), var(--accent2));
     border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1rem;
-    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem; flex-shrink: 0;
   }
 
-  .file-name {
-    font-size: 0.9rem;
-    font-weight: 500;
-  }
+  .file-name { font-size: 0.88rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-size { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
 
-  .file-size {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    margin-top: 2px;
-  }
+  .file-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
 
-  /* USER TABLE */
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.85rem;
-  }
-
-  th {
-    text-align: left;
-    padding: 0.7rem 1rem;
-    color: var(--text-muted);
-    font-weight: 500;
-    border-bottom: 1px solid var(--border);
-  }
-
-  td {
-    padding: 0.8rem 1rem;
-    border-bottom: 1px solid var(--border);
-    vertical-align: middle;
-  }
-
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th { text-align: left; padding: 0.7rem 0.8rem; color: var(--text-muted); font-weight: 500; border-bottom: 1px solid var(--border); }
+  td { padding: 0.8rem 0.8rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
   tr:last-child td { border-bottom: none; }
 
-  /* UPLOAD AREA */
   .upload-area {
     border: 2px dashed var(--border);
     border-radius: 10px;
-    padding: 2rem;
+    padding: 1.5rem;
     text-align: center;
     cursor: pointer;
     transition: all 0.2s;
     margin-bottom: 1rem;
   }
-
-  .upload-area:hover, .upload-area.drag-over {
-    border-color: var(--accent);
-    background: #4f7cff08;
-  }
-
+  .upload-area:hover, .upload-area.drag-over { border-color: var(--accent); background: #4f7cff08; }
   .upload-icon { font-size: 2rem; margin-bottom: 0.5rem; }
-  .upload-text { font-size: 0.9rem; color: var(--text-muted); }
+  .upload-text { font-size: 0.88rem; color: var(--text-muted); }
 
-  /* ALERT */
-  .alert {
-    padding: 0.8rem 1rem;
-    border-radius: 8px;
-    font-size: 0.85rem;
-    margin-bottom: 1rem;
-  }
+  .alert { padding: 0.8rem 1rem; border-radius: 8px; font-size: 0.85rem; margin-bottom: 1rem; }
   .alert-error { background: #f05e5e18; border: 1px solid var(--danger); color: var(--danger); }
   .alert-success { background: #4caf8a18; border: 1px solid var(--success); color: var(--success); }
-  .alert-info { background: #4f7cff18; border: 1px solid var(--accent); color: var(--accent); }
 
-  /* SECTIONS */
-  .section-title {
-    font-size: 1.4rem;
-    font-weight: 700;
-    margin-bottom: 0.4rem;
-  }
+  .section-title { font-size: 1.3rem; font-weight: 700; margin-bottom: 0.3rem; }
+  .section-sub { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.2rem; }
 
-  .section-sub {
-    font-size: 0.85rem;
-    color: var(--text-muted);
-    margin-bottom: 1.5rem;
-  }
-
-  /* PENDING */
-  .pending-msg {
-    text-align: center;
-    padding: 3rem 2rem;
-    color: var(--text-muted);
-  }
-
+  .pending-msg { text-align: center; padding: 3rem 2rem; color: var(--text-muted); }
   .pending-msg .icon { font-size: 3rem; margin-bottom: 1rem; }
   .pending-msg h3 { font-size: 1.1rem; color: var(--text); margin-bottom: 0.5rem; }
 
-  /* PROGRESS */
-  .progress-bar {
-    height: 4px;
-    background: var(--border);
-    border-radius: 2px;
-    margin-top: 0.5rem;
-    overflow: hidden;
-  }
+  .progress-bar { height: 4px; background: var(--border); border-radius: 2px; margin-top: 0.5rem; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width 0.3s; }
 
-  .progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--accent), var(--accent2));
-    transition: width 0.3s;
+  /* PWA 설치 배너 */
+  .pwa-banner {
+    background: linear-gradient(135deg, #4f7cff22, #7c5cfc22);
+    border: 1px solid var(--accent);
+    border-radius: 12px;
+    padding: 1rem 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.2rem;
+    gap: 1rem;
   }
+  .pwa-banner-text { font-size: 0.85rem; }
+  .pwa-banner-text strong { display: block; margin-bottom: 0.2rem; }
+  .pwa-banner-text span { color: var(--text-muted); font-size: 0.78rem; }
 
   #app { display: none; }
 </style>
@@ -340,7 +242,6 @@
 <body>
 
 <div id="app">
-  <!-- NAV -->
   <nav>
     <div class="nav-logo">📋 시험문제 자료실</div>
     <div class="nav-right">
@@ -350,12 +251,11 @@
     </div>
   </nav>
 
-  <!-- MAIN -->
   <div class="container">
 
-    <!-- AUTH PAGE -->
-    <div id="page-auth" style="max-width:420px;margin:4rem auto;">
-      <div style="text-align:center;margin-bottom:2rem;">
+    <!-- AUTH -->
+    <div id="page-auth" style="max-width:420px;margin:3rem auto;">
+      <div style="text-align:center;margin-bottom:1.5rem;">
         <div style="font-size:2.5rem;margin-bottom:0.5rem;">📋</div>
         <div class="section-title">시험문제 자료실</div>
         <div class="section-sub">로그인하여 자료에 접근하세요</div>
@@ -366,7 +266,6 @@
           <button class="tab" onclick="switchTab('signup')">회원가입</button>
         </div>
         <div id="auth-alert"></div>
-
         <div id="tab-login">
           <div class="form-group">
             <label>이메일</label>
@@ -378,7 +277,6 @@
           </div>
           <button class="btn btn-primary" onclick="doLogin()">로그인</button>
         </div>
-
         <div id="tab-signup" style="display:none">
           <div class="form-group">
             <label>이메일</label>
@@ -393,7 +291,7 @@
       </div>
     </div>
 
-    <!-- PENDING PAGE -->
+    <!-- PENDING -->
     <div id="page-pending" style="display:none">
       <div class="pending-msg">
         <div class="icon">⏳</div>
@@ -402,20 +300,22 @@
       </div>
     </div>
 
-    <!-- SUPERVISOR PAGE -->
+    <!-- SUPERVISOR -->
     <div id="page-supervisor" style="display:none">
       <div class="section-title">시험 자료 다운로드</div>
       <div class="section-sub">총감독관 전용 자료실입니다</div>
+      <div id="pwa-banner-supervisor"></div>
       <div id="file-list-supervisor"></div>
     </div>
 
-    <!-- ADMIN PAGE -->
+    <!-- ADMIN -->
     <div id="page-admin" style="display:none">
       <div class="section-title">관리자 페이지</div>
       <div class="section-sub">파일 업로드 및 사용자 관리</div>
 
-      <!-- Upload -->
-      <div class="card" style="margin-bottom:1.5rem;">
+      <div id="pwa-banner-admin"></div>
+
+      <div class="card">
         <h2>📤 파일 업로드</h2>
         <div id="upload-alert"></div>
         <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
@@ -429,13 +329,11 @@
         </div>
       </div>
 
-      <!-- Files -->
-      <div class="card" style="margin-bottom:1.5rem;">
+      <div class="card">
         <h2>📁 업로드된 파일</h2>
         <div id="file-list-admin"></div>
       </div>
 
-      <!-- Users -->
       <div class="card">
         <h2>👥 사용자 관리</h2>
         <div id="user-list"></div>
@@ -446,25 +344,58 @@
 </div>
 
 <script>
-// ========== SUPABASE 설정 ==========
 const SUPABASE_URL = 'https://byopoabytpmtoknsyxgg.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_DSknfCBYi3gWmxadzhJX2A_nT80WHly';
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
-
-// 관리자 이메일 (본인 이메일로 변경)
 const ADMIN_EMAIL = 'wlsgks189@gmail.com';
 
 let currentUser = null;
-let currentProfile = null;
+let deferredPrompt = null;
 
-// ========== INIT ==========
+// PWA 설치 이벤트 감지
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  showPWABanner();
+});
+
+function showPWABanner() {
+  const isIOS = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+  if (isStandalone) return;
+
+  const bannerHTML = isIOS ? `
+    <div class="pwa-banner">
+      <div class="pwa-banner-text">
+        <strong>📱 홈 화면에 추가하기</strong>
+        <span>Safari 하단 공유버튼 → "홈 화면에 추가" 탭하세요</span>
+      </div>
+    </div>` : `
+    <div class="pwa-banner">
+      <div class="pwa-banner-text">
+        <strong>📱 앱으로 설치하기</strong>
+        <span>홈 화면에 추가하면 앱처럼 사용 가능해요</span>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="installPWA()">설치</button>
+    </div>`;
+
+  document.getElementById('pwa-banner-admin').innerHTML = bannerHTML;
+  document.getElementById('pwa-banner-supervisor').innerHTML = bannerHTML;
+}
+
+async function installPWA() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  await deferredPrompt.userChoice;
+  deferredPrompt = null;
+}
+
 async function init() {
   const { data: { session } } = await sb.auth.getSession();
-  if (session) {
-    await loadUser(session.user);
-  }
+  if (session) await loadUser(session.user);
   document.getElementById('app').style.display = 'block';
+  showPWABanner();
 
   sb.auth.onAuthStateChange(async (event, session) => {
     if (session) await loadUser(session.user);
@@ -475,12 +406,9 @@ async function init() {
 async function loadUser(user) {
   currentUser = user;
   const { data: profile } = await sb.from('profiles').select('*').eq('id', user.id).single();
-  currentProfile = profile;
-
   const role = user.email === ADMIN_EMAIL ? 'admin' : (profile?.role || 'pending');
 
   document.getElementById('nav-email').textContent = user.email;
-
   const badges = { admin: ['관리자', 'badge-admin'], supervisor: ['총감독관', 'badge-supervisor'], pending: ['승인대기', 'badge-pending'] };
   const [label, cls] = badges[role] || badges.pending;
   const badge = document.getElementById('nav-badge');
@@ -499,7 +427,6 @@ function showPage(name) {
   document.getElementById('page-' + name).style.display = 'block';
 }
 
-// ========== AUTH ==========
 function switchTab(tab) {
   document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', (tab==='login'&&i===0)||(tab==='signup'&&i===1)));
   document.getElementById('tab-login').style.display = tab === 'login' ? 'block' : 'none';
@@ -529,11 +456,10 @@ async function logout() {
   document.getElementById('nav-badge').textContent = '';
 }
 
-// ========== FILES ==========
 async function loadSupervisorFiles() {
   const { data } = await sb.storage.from('exam-zips').list('', { sortBy: { column: 'created_at', order: 'desc' } });
   const el = document.getElementById('file-list-supervisor');
-  if (!data || data.length === 0) {
+  if (!data || data.filter(f=>f.name.endsWith('.zip')).length === 0) {
     el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-muted)">업로드된 파일이 없습니다</div>';
     return;
   }
@@ -541,12 +467,15 @@ async function loadSupervisorFiles() {
     <div class="file-item">
       <div class="file-info">
         <div class="file-icon">📦</div>
-        <div>
+        <div style="min-width:0">
           <div class="file-name">${f.name}</div>
           <div class="file-size">${formatSize(f.metadata?.size)}</div>
         </div>
       </div>
-      <button class="btn btn-success btn-sm" onclick="downloadFile('${f.name}')">⬇ 다운로드</button>
+      <div class="file-actions">
+        <button class="btn btn-success btn-sm" onclick="downloadFile('${f.name}')">⬇ 다운로드</button>
+        <button class="btn btn-share btn-sm" onclick="shareFile('${f.name}')">공유</button>
+      </div>
     </div>
   `).join('');
 }
@@ -554,7 +483,7 @@ async function loadSupervisorFiles() {
 async function loadAdminFiles() {
   const { data } = await sb.storage.from('exam-zips').list('', { sortBy: { column: 'created_at', order: 'desc' } });
   const el = document.getElementById('file-list-admin');
-  if (!data || data.length === 0) {
+  if (!data || data.filter(f=>f.name.endsWith('.zip')).length === 0) {
     el.innerHTML = '<div style="text-align:center;padding:1rem;color:var(--text-muted)">업로드된 파일 없음</div>';
     return;
   }
@@ -562,12 +491,15 @@ async function loadAdminFiles() {
     <div class="file-item">
       <div class="file-info">
         <div class="file-icon">📦</div>
-        <div>
+        <div style="min-width:0">
           <div class="file-name">${f.name}</div>
           <div class="file-size">${formatSize(f.metadata?.size)}</div>
         </div>
       </div>
-      <button class="btn btn-danger btn-sm" onclick="deleteFile('${f.name}')">🗑 삭제</button>
+      <div class="file-actions">
+        <button class="btn btn-share btn-sm" onclick="shareFile('${f.name}')">공유</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteFile('${f.name}')">🗑</button>
+      </div>
     </div>
   `).join('');
 }
@@ -581,6 +513,34 @@ async function downloadFile(name) {
   URL.revokeObjectURL(url);
 }
 
+async function shareFile(name) {
+  try {
+    // 파일 다운로드 후 공유
+    const { data } = await sb.storage.from('exam-zips').download(name);
+    if (!data) return;
+
+    const file = new File([data], name, { type: 'application/zip' });
+
+    // Web Share API로 파일 직접 공유 (아이폰 지원)
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({
+        files: [file],
+        title: name,
+      });
+    } else if (navigator.share) {
+      // 파일 공유 안되면 URL 공유
+      const url = URL.createObjectURL(data);
+      await navigator.share({ title: name, url: window.location.href });
+      URL.revokeObjectURL(url);
+    } else {
+      // 지원 안하면 그냥 다운로드
+      downloadFile(name);
+    }
+  } catch (e) {
+    if (e.name !== 'AbortError') downloadFile(name);
+  }
+}
+
 async function deleteFile(name) {
   if (!confirm(`"${name}" 을 삭제할까요?`)) return;
   await sb.storage.from('exam-zips').remove([name]);
@@ -592,21 +552,14 @@ async function uploadFile(file) {
   if (!file.name.endsWith('.zip')) {
     showAlert('upload-alert', 'ZIP 파일만 업로드 가능합니다', 'error'); return;
   }
-
   document.getElementById('upload-progress').style.display = 'block';
   document.getElementById('progress-fill').style.width = '30%';
-  document.getElementById('upload-progress-text').textContent = '업로드 중...';
 
   const { error } = await sb.storage.from('exam-zips').upload(file.name, file, { upsert: true });
-
   document.getElementById('progress-fill').style.width = '100%';
 
-  if (error) {
-    showAlert('upload-alert', '업로드 실패: ' + error.message, 'error');
-  } else {
-    showAlert('upload-alert', '업로드 완료!', 'success');
-    loadAdminFiles();
-  }
+  if (error) showAlert('upload-alert', '업로드 실패: ' + error.message, 'error');
+  else { showAlert('upload-alert', '업로드 완료!', 'success'); loadAdminFiles(); }
 
   setTimeout(() => {
     document.getElementById('upload-progress').style.display = 'none';
@@ -614,7 +567,6 @@ async function uploadFile(file) {
   }, 1500);
 }
 
-// Drag & Drop
 const area = document.getElementById('upload-area');
 if (area) {
   area.addEventListener('dragover', e => { e.preventDefault(); area.classList.add('drag-over'); });
@@ -622,7 +574,6 @@ if (area) {
   area.addEventListener('drop', e => { e.preventDefault(); area.classList.remove('drag-over'); uploadFile(e.dataTransfer.files[0]); });
 }
 
-// ========== USERS ==========
 async function loadUsers() {
   const { data } = await sb.from('profiles').select('*').order('created_at', { ascending: false });
   const el = document.getElementById('user-list');
@@ -630,24 +581,16 @@ async function loadUsers() {
     el.innerHTML = '<div style="text-align:center;padding:1rem;color:var(--text-muted)">가입한 사용자 없음</div>';
     return;
   }
-
   const rows = data.map(u => {
     const isAdmin = u.email === ADMIN_EMAIL;
     const role = isAdmin ? 'admin' : u.role;
     const roleLabel = { admin: '관리자', supervisor: '총감독관', pending: '대기중' }[role] || '대기중';
     const badgeCls = { admin: 'badge-admin', supervisor: 'badge-supervisor', pending: 'badge-pending' }[role] || 'badge-pending';
-
     const btn = isAdmin ? '' : role === 'supervisor'
       ? `<button class="btn btn-outline btn-sm" onclick="setRole('${u.id}','pending')">권한 해제</button>`
       : `<button class="btn btn-success btn-sm" onclick="setRole('${u.id}','supervisor')">총감독관 지정</button>`;
-
-    return `<tr>
-      <td>${u.email || '-'}</td>
-      <td><span class="badge ${badgeCls}">${roleLabel}</span></td>
-      <td>${btn}</td>
-    </tr>`;
+    return `<tr><td>${u.email||'-'}</td><td><span class="badge ${badgeCls}">${roleLabel}</span></td><td>${btn}</td></tr>`;
   }).join('');
-
   el.innerHTML = `<table><thead><tr><th>이메일</th><th>역할</th><th>관리</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
@@ -656,12 +599,8 @@ async function setRole(userId, role) {
   loadUsers();
 }
 
-async function loadAdminData() {
-  loadAdminFiles();
-  loadUsers();
-}
+async function loadAdminData() { loadAdminFiles(); loadUsers(); }
 
-// ========== UTILS ==========
 function showAlert(elId, msg, type) {
   document.getElementById(elId).innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
   setTimeout(() => { const el = document.getElementById(elId); if(el) el.innerHTML = ''; }, 4000);
@@ -675,6 +614,13 @@ function formatSize(bytes) {
 }
 
 init();
+</script>
+
+<!-- Service Worker 등록 -->
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
 </script>
 </body>
 </html>
