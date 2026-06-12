@@ -437,6 +437,10 @@ function initDateSelects() {
 
 // ===== FILES =====
 function parseFileName(name) {
+  // 새 형식: YYYY-MM-DD_타입_저장명__orig__원본명__memo__메모.zip
+  const m2=name.match(/^(\d{4})-(\d{2})-(\d{2})_(정기|단체)_(.+?)__orig__(.+?)(?:__memo__(.+?))?\.zip$/);
+  if (m2) return {year:m2[1],month:m2[2],day:m2[3],type:m2[4],displayName:m2[6],memo:m2[7]||'',original:m2[6]+'.zip',label:`${m2[1]}년 ${m2[2]}월 ${m2[3]}일 (${m2[4]})`};
+  // 구 형식: YYYY-MM-DD_타입_파일명.zip
   const m=name.match(/^(\d{4})-(\d{2})-(\d{2})_(정기|단체)_(.+?)(?:__memo__(.+?))?\.zip$/);
   if (m) return {year:m[1],month:m[2],day:m[3],type:m[4],displayName:m[5],memo:m[6]||'',original:m[5]+'.zip',label:`${m[1]}년 ${m[2]}월 ${m[3]}일 (${m[4]})`};
   return null;
@@ -577,11 +581,11 @@ async function deleteFile(name) {
 }
 
 function safeName(str) {
+  // 영숫자, 하이픈만 허용 - Supabase key 규칙 준수
   return str
-    .replace(/[()\[\]{}\s]/g, "_")
-    .replace(/[^\w\-_.]/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_|_$/g, "");
+    .replace(/[^a-zA-Z0-9\-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '');
 }
 
 async function uploadFile(file) {
@@ -592,9 +596,13 @@ async function uploadFile(file) {
   const day=document.getElementById('upload-day').value;
   const type=document.getElementById('upload-type').value;
   const memo=document.getElementById('upload-memo').value.trim();
-  const baseName=safeName(file.name.replace(/\.zip$/,''));
+  const originalName=file.name.replace(/\.zip$/,'');
+  const baseName=safeName(originalName);
+  const safeOrig=safeName(originalName);
   const safeMemo=memo?safeName(memo):'';
-  const storageName=safeMemo?`${year}-${month}-${day}_${type}_${baseName}__memo__${safeMemo}.zip`:`${year}-${month}-${day}_${type}_${baseName}.zip`;
+  const storageName=safeMemo
+    ? `${year}-${month}-${day}_${type}_${baseName}__orig__${safeOrig}__memo__${safeMemo}.zip`
+    : `${year}-${month}-${day}_${type}_${baseName}__orig__${safeOrig}.zip`;
   document.getElementById('upload-progress').style.display='block';
   document.getElementById('progress-fill').style.width='40%';
   const {error}=await sb.storage.from('exam-zips').upload(storageName,file,{upsert:true});
