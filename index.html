@@ -121,7 +121,54 @@ tr:last-child td{border-bottom:none;}
 .toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:var(--success);color:white;padding:.7rem 1.5rem;border-radius:20px;font-size:.84rem;font-weight:500;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;}
 .toast.show{opacity:1;}
 .theme-btn{background:transparent;border:1px solid var(--border);border-radius:8px;padding:.3rem .6rem;cursor:pointer;font-size:1rem;color:var(--text-muted);}
+.logout-icon{display:none;}
+.logout-text{display:inline;}
 #app{display:none;}
+
+/* ===== 모바일 최적화 ===== */
+@media (max-width: 600px) {
+  nav{padding:0 .75rem;height:56px;}
+  .nav-user{display:none;}
+  .nav-logo{font-size:.95rem;}
+  .nav-right{gap:.4rem;}
+  .logout-text{display:none;}
+  .logout-icon{display:inline;}
+  .logout-btn{padding:.3rem .6rem;font-size:1rem;}
+  .theme-btn{padding:.25rem .5rem;font-size:.9rem;}
+  .badge{font-size:.62rem;padding:2px 5px;}
+
+  .container{padding:1rem .75rem;}
+  .card{padding:1.1rem;}
+
+  /* 업로드 폼 - 모바일에서 2열로 */
+  .form-row{flex-wrap:wrap;}
+  .form-row .form-group{min-width:calc(50% - .3rem);}
+
+  /* 파일 아이템 - 버튼 아래로 */
+  .file-item{flex-wrap:wrap;}
+  .file-actions{width:100%;justify-content:flex-end;margin-top:.4rem;}
+
+  /* 버튼 터치 영역 확대 */
+  .btn-sm{padding:.45rem .9rem;font-size:.8rem;}
+
+  /* 탭 글자 크기 */
+  .main-tab{padding:.75rem .85rem;font-size:.78rem;}
+
+  /* 테이블 이메일 줄임 */
+  td:first-child{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  /* 할일 입력 폼 세로 배치 */
+  #tab-todo .card > div{flex-direction:column;}
+  #tab-todo .card > div .btn{width:100%;justify-content:center;}
+
+  /* 필터바 */
+  .filter-bar{gap:.4rem;}
+  .filter-toggle{font-size:.75rem;}
+
+  /* 날짜 헤더 */
+  .date-group-title{font-size:.9rem;}
+}
+
 </style>
 </head>
 <body>
@@ -132,7 +179,10 @@ tr:last-child td{border-bottom:none;}
       <button class="theme-btn" onclick="toggleTheme()" id="theme-btn">🌙</button>
       <span class="nav-user" id="nav-email"></span>
       <span class="badge" id="nav-badge"></span>
-      <button class="btn btn-outline btn-sm" onclick="logout()">로그아웃</button>
+      <button class="btn btn-outline btn-sm logout-btn" onclick="logout()">
+        <span class="logout-text">로그아웃</span>
+        <span class="logout-icon">↩</span>
+      </button>
     </div>
   </nav>
 
