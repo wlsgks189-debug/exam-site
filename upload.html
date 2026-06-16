@@ -39,6 +39,7 @@ let allFiles=[], fileMeta={};
 
 window.addEventListener('load', () => {
   initAuth(() => {
+    document.getElementById('main-content').style.display = 'block';
     // 관리자만 접근
     if(currentRole !== 'admin') { window.location.href = 'index.html'; return; }
     initDateSelects();
@@ -148,7 +149,7 @@ window.addEventListener('load',()=>{
 });
 </script>
 
-<div class="container">
+<div id="main-content" style="display:none"><div class="container">
   <div class="card">
     <h2>📤 파일 업로드</h2>
     <div id="upload-alert"></div>
@@ -190,6 +191,6 @@ window.addEventListener('load',()=>{
     <h2>📁 업로드된 파일</h2>
     <div id="uploaded-files"><div class="empty">불러오는 중...</div></div>
   </div>
-</div>
+</div></div>
 </body>
 </html>

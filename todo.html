@@ -82,6 +82,7 @@ const PRIORITY = {
 
 window.addEventListener('load', () => {
   initAuth(() => {
+    document.getElementById('main-content').style.display = 'block';
     initTodo();
     requestPush();
   });
@@ -293,7 +294,7 @@ async function loadGcal(){
 }
 </script>
 
-<div class="container">
+<div id="main-content" style="display:none"><div class="container">
   <!-- 입력 -->
   <div class="card">
     <h2>할일 추가</h2>
@@ -363,6 +364,6 @@ async function loadGcal(){
     </div>
     <div id="todo-history"><div class="empty">완료된 할일이 없습니다</div></div>
   </div>
-</div>
+</div></div>
 </body>
 </html>
