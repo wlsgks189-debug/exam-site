@@ -428,6 +428,41 @@ tr:last-child td{border-bottom:none;}
     </div>
   </div>
 </div>
+
+<!-- 할일 편집 모달 -->
+<div id="todo-edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;display:none;align-items:center;justify-content:center;padding:1rem">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:1.5rem;width:100%;max-width:480px;box-shadow:0 8px 32px rgba(0,0,0,.4)">
+    <h2 style="font-size:1.1rem;margin-bottom:1.2rem">✏️ 할일 편집</h2>
+    <input type="hidden" id="edit-todo-id">
+    <div class="form-group">
+      <label>할일 내용</label>
+      <input type="text" id="edit-todo-text">
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1">
+        <label>시작</label>
+        <select id="edit-todo-start"><option value="">시간 선택</option></select>
+      </div>
+      <div class="form-group" style="flex:1">
+        <label>종료</label>
+        <select id="edit-todo-end"><option value="">시간 선택</option></select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>우선순위</label>
+      <select id="edit-todo-priority">
+        <option value="high">🔴 높음</option>
+        <option value="medium">🟡 보통</option>
+        <option value="low">🟢 낮음</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:.7rem;margin-top:.5rem">
+      <button class="btn btn-primary" style="flex:1" onclick="saveTodoEdit()">저장</button>
+      <button class="btn btn-outline" style="flex:1;margin:0" onclick="closeEditModal()">취소</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -949,7 +984,10 @@ async function loadTodos() {
           ${t.done?`<span style="font-size:.7rem;color:var(--text-muted)">✅ ${formatDoneTime(t.done_at)}</span>`:''}
         </div>
       </div>
-      <button class="btn btn-danger btn-sm" onclick="deleteTodo('${t.id}')" style="padding:.2rem .4rem">🗑</button>
+      <div style="display:flex;gap:.3rem">
+        <button class="btn btn-outline btn-sm" onclick="editTodo('${t.id}')" style="padding:.2rem .4rem">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteTodo('${t.id}')" style="padding:.2rem .4rem">🗑</button>
+      </div>
     </div>`;
   }).join('');
 }
@@ -1155,6 +1193,62 @@ async function loadGcal() {
     el.innerHTML = `<div class="empty" style="color:var(--danger)">⚠️ 오류 발생: ${e.message}</div>`;
   }
 }
+
+
+async function editTodo(id) {
+  const { data } = await sb.from('todos').select('*').eq('id', id).single();
+  if (!data) return;
+
+  document.getElementById('edit-todo-id').value = data.id;
+  document.getElementById('edit-todo-text').value = data.text;
+  document.getElementById('edit-todo-priority').value = data.priority || 'medium';
+
+  // 시간 셀렉트 초기화
+  const startEl = document.getElementById('edit-todo-start');
+  const endEl = document.getElementById('edit-todo-end');
+  if (startEl.options.length <= 1) {
+    for (let h = 9; h <= 18; h++) {
+      for (let m of ['00','30']) {
+        if (h === 18 && m === '30') break;
+        const val = `${String(h).padStart(2,'0')}:${m}`;
+        startEl.innerHTML += `<option value="${val}">${val}</option>`;
+        endEl.innerHTML += `<option value="${val}">${val}</option>`;
+      }
+    }
+  }
+  startEl.value = data.start_time || '';
+  endEl.value = data.end_time || '';
+
+  const modal = document.getElementById('todo-edit-modal');
+  modal.style.display = 'flex';
+}
+
+async function saveTodoEdit() {
+  const id = document.getElementById('edit-todo-id').value;
+  const text = document.getElementById('edit-todo-text').value.trim();
+  const priority = document.getElementById('edit-todo-priority').value;
+  const start_time = document.getElementById('edit-todo-start').value || null;
+  const end_time = document.getElementById('edit-todo-end').value || null;
+
+  if (!text) { showToast('⚠️ 내용을 입력해주세요'); return; }
+
+  const { error } = await sb.from('todos').update({ text, priority, start_time, end_time }).eq('id', id);
+  if (!error) {
+    closeEditModal();
+    await loadTodos();
+    showToast('✅ 수정됐어요!');
+  }
+}
+
+function closeEditModal() {
+  document.getElementById('todo-edit-modal').style.display = 'none';
+}
+
+// 모달 바깥 클릭시 닫기
+document.getElementById('todo-edit-modal')?.addEventListener('click', function(e) {
+  if (e.target === this) closeEditModal();
+});
+
 
 // ===== UTILS =====
 function showAlert(elId,msg,type){const el=document.getElementById(elId);if(el){el.innerHTML=`<div class="alert alert-${type}">${msg}</div>`;setTimeout(()=>{if(el)el.innerHTML='';},4000);}}
