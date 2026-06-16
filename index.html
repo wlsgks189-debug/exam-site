@@ -81,7 +81,7 @@ select option{background:var(--surface2);color:var(--text);}
 .template-title{font-size:.92rem;font-weight:600;margin-bottom:.5rem;}
 .template-body{font-size:.82rem;color:var(--text-muted);line-height:1.65;white-space:pre-wrap;background:var(--bg);border-radius:6px;padding:.75rem;margin-bottom:.7rem;border:1px solid var(--border);}
 .template-vars{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.7rem;}
-.var-input-group{display:flex;flex-direction:column;gap:.2rem;flex:1;min-width:120px;}
+.var-input-group{display:flex;flex-direction:column;gap:.2rem;flex:1;min-width:140px;}
 .var-input-group label{font-size:.7rem;}
 .var-input-group input{padding:.35rem .7rem;font-size:.8rem;}
 .notify-preview{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:1rem;font-size:.84rem;line-height:1.7;white-space:pre-wrap;color:var(--text);margin-bottom:.8rem;}
@@ -146,48 +146,91 @@ tr:last-child td{border-bottom:none;}
 .logout-text{display:inline;}
 #app{display:none;}
 
-/* ===== 모바일 최적화 ===== */
+/* ===== 모바일 최적화 (아이폰 15 Pro 기준) ===== */
 @media (max-width: 600px) {
+  /* 네비게이션 */
   nav{padding:0 .75rem;height:56px;}
   .nav-user{display:none;}
   .nav-logo{font-size:.95rem;}
   .nav-right{gap:.4rem;}
   .logout-text{display:none;}
   .logout-icon{display:inline;}
-  .logout-btn{padding:.3rem .6rem;font-size:1rem;}
-  .theme-btn{padding:.25rem .5rem;font-size:.9rem;}
+  .logout-btn{padding:.35rem .65rem;font-size:1rem;}
+  .theme-btn{padding:.28rem .5rem;font-size:.95rem;}
   .badge{font-size:.62rem;padding:2px 5px;}
 
-  .container{padding:1rem .75rem;}
-  .card{padding:1.1rem;}
+  /* 탭바 - 스크롤 가능하게 */
+  .main-tabs{padding:0 .5rem;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+  .main-tabs::-webkit-scrollbar{display:none;}
+  .main-tab{padding:.75rem .8rem;font-size:.76rem;}
 
-  /* 업로드 폼 - 모바일에서 2열로 */
+  /* 레이아웃 */
+  .container{padding:.9rem .75rem;}
+  .card{padding:1rem;border-radius:10px;margin-bottom:1rem;}
+  .section-title{font-size:1.1rem;}
+
+  /* 폼 */
   .form-row{flex-wrap:wrap;}
   .form-row .form-group{min-width:calc(50% - .3rem);}
+  input,select,textarea{font-size:16px !important;} /* iOS 줌 방지 */
 
-  /* 파일 아이템 - 버튼 아래로 */
-  .file-item{flex-wrap:wrap;}
-  .file-actions{width:100%;justify-content:flex-end;margin-top:.4rem;}
+  /* 파일 아이템 */
+  .file-item{flex-wrap:wrap;padding:.75rem;}
+  .file-actions{width:100%;justify-content:flex-end;margin-top:.5rem;gap:.4rem;}
+  .file-name{font-size:.82rem;}
 
-  /* 버튼 터치 영역 확대 */
-  .btn-sm{padding:.45rem .9rem;font-size:.8rem;}
+  /* 버튼 - 터치 영역 확대 */
+  .btn-sm{padding:.5rem .9rem;font-size:.8rem;min-height:36px;}
+  .btn{min-height:44px;} /* iOS 권장 터치 영역 */
+  .btn-primary{min-height:48px;font-size:.92rem;}
 
-  /* 탭 글자 크기 */
-  .main-tab{padding:.75rem .85rem;font-size:.78rem;}
-
-  /* 테이블 이메일 줄임 */
-  td:first-child{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-
-  /* 할일 입력 폼 세로 배치 */
-  #tab-todo .card > div{flex-direction:column;}
-  #tab-todo .card > div .btn{width:100%;justify-content:center;}
+  /* 날짜 그룹 */
+  .date-group-header{padding:.65rem .85rem;}
+  .date-group-title{font-size:.88rem;}
+  .exam-type-badge{font-size:.68rem;}
 
   /* 필터바 */
   .filter-bar{gap:.4rem;}
+  .filter-bar select{font-size:.82rem;}
   .filter-toggle{font-size:.75rem;}
 
-  /* 날짜 헤더 */
-  .date-group-title{font-size:.9rem;}
+  /* 테이블 */
+  table{font-size:.78rem;}
+  td:first-child{max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  th,td{padding:.6rem .6rem;}
+
+  /* 할일 탭 */
+  .todo-item{padding:.65rem .75rem;}
+  .todo-text{font-size:.85rem;}
+
+  /* 히스토리 */
+  .history-month-title{font-size:.84rem;padding:.65rem .85rem;}
+  .history-item{font-size:.78rem;}
+
+  /* 모달 */
+  #todo-edit-modal > div{margin:.5rem;border-radius:14px;}
+
+  /* 민원 템플릿 */
+  .template-item{padding:.9rem 1rem;}
+  .template-title{font-size:.88rem;}
+  .template-body{font-size:.78rem;}
+
+  /* PWA 배너 */
+  .pwa-banner{padding:.8rem 1rem;gap:.6rem;}
+  .pwa-banner-text strong{font-size:.82rem;}
+
+  /* 멀티 선택바 */
+  .multi-bar{padding:.6rem .85rem;}
+
+  /* Safe area (홈바 영역) */
+  .container{padding-bottom:calc(.9rem + env(safe-area-inset-bottom));}
+  nav{padding-top:env(safe-area-inset-top);}
+}
+
+/* 아이폰 노치/다이나믹 아일랜드 대응 */
+@supports (padding-top: env(safe-area-inset-top)) {
+  nav{padding-top:max(.5rem, env(safe-area-inset-top));}
+  .toast{bottom:calc(2rem + env(safe-area-inset-bottom));}
 }
 
 </style>
@@ -276,11 +319,11 @@ tr:last-child td{border-bottom:none;}
         <div class="card">
           <h2>📤 파일 업로드</h2>
           <div id="upload-alert"></div>
-          <div class="form-row">
-            <div class="form-group"><label>년도</label><select id="upload-year"></select></div>
-            <div class="form-group"><label>월</label><select id="upload-month"></select></div>
-            <div class="form-group"><label>일</label><select id="upload-day"></select></div>
-            <div class="form-group"><label>요일</label>
+          <div class="form-row" style="flex-wrap:wrap">
+            <div class="form-group" style="min-width:calc(50% - .3rem)"><label>년도</label><select id="upload-year"></select></div>
+            <div class="form-group" style="min-width:calc(50% - .3rem)"><label>월</label><select id="upload-month"></select></div>
+            <div class="form-group" style="min-width:calc(50% - .3rem)"><label>일</label><select id="upload-day"></select></div>
+            <div class="form-group" style="min-width:calc(50% - .3rem)"><label>요일</label>
               <select id="upload-dow">
                 <option value="월">월</option><option value="화">화</option>
                 <option value="수">수</option><option value="목">목</option>
@@ -340,37 +383,35 @@ tr:last-child td{border-bottom:none;}
         <!-- 입력 -->
         <div class="card">
           <h2>할일 추가</h2>
-          <div class="form-row">
-            <div class="form-group" style="flex:1.5">
+          <div class="form-row" style="flex-wrap:wrap">
+            <div class="form-group" style="min-width:100%">
               <label>날짜</label>
               <input type="date" id="todo-date" onchange="loadTodos()">
             </div>
-            <div class="form-group" style="flex:1">
-              <label>시작</label>
+            <div class="form-group" style="flex:1;min-width:calc(50% - .3rem)">
+              <label>시작 시간</label>
               <select id="todo-start">
-                <option value="">시간 선택</option>
+                <option value="">선택</option>
               </select>
             </div>
-            <div class="form-group" style="flex:1">
-              <label>종료</label>
+            <div class="form-group" style="flex:1;min-width:calc(50% - .3rem)">
+              <label>종료 시간</label>
               <select id="todo-end">
-                <option value="">시간 선택</option>
+                <option value="">선택</option>
               </select>
             </div>
           </div>
-          <div class="form-row">
-            <div class="form-group" style="flex:3">
-              <label>할일 내용</label>
-              <input type="text" id="todo-input" placeholder="할일을 입력하세요" onkeydown="if(event.key==='Enter')addTodo()">
-            </div>
-            <div class="form-group" style="flex:1">
-              <label>우선순위</label>
-              <select id="todo-priority">
-                <option value="high">🔴 높음</option>
-                <option value="medium" selected>🟡 보통</option>
-                <option value="low">🟢 낮음</option>
-              </select>
-            </div>
+          <div class="form-group">
+            <label>할일 내용</label>
+            <textarea id="todo-input" placeholder="할일을 입력하세요&#10;(Shift+Enter로 줄바꿈)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();addTodo();}" style="min-height:48px;max-height:120px;resize:none;overflow-y:auto;line-height:1.5;padding:.65rem .9rem;" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+          </div>
+          <div class="form-group">
+            <label>우선순위</label>
+            <select id="todo-priority">
+              <option value="high">🔴 높음</option>
+              <option value="medium" selected>🟡 보통</option>
+              <option value="low">🟢 낮음</option>
+            </select>
           </div>
           <button class="btn btn-primary" onclick="addTodo()">+ 할일 추가</button>
         </div>
@@ -436,7 +477,7 @@ tr:last-child td{border-bottom:none;}
     <input type="hidden" id="edit-todo-id">
     <div class="form-group">
       <label>할일 내용</label>
-      <input type="text" id="edit-todo-text">
+      <textarea id="edit-todo-text" style="min-height:60px;resize:none;" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
     </div>
     <div class="form-row">
       <div class="form-group" style="flex:1">
