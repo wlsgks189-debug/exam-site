@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>로그인 — 짱구's Desk</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d1117">
+<link rel="manifest" href="manifest.json">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js"></script>
+<style>
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+.login-wrap{width:100%;max-width:400px;padding:1.5rem;}
+.auth-tabs{display:flex;margin-bottom:1.2rem;border-bottom:1px solid var(--border);}
+.auth-tab{padding:.6rem 1rem;font-size:.88rem;cursor:pointer;border:none;background:none;color:var(--text-muted);font-family:inherit;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s;}
+.auth-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+</style>
+</head>
+<body>
+<div class="login-wrap">
+  <div style="text-align:center;margin-bottom:1.5rem;">
+    <svg width="60" height="60" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg" style="border-radius:14px;">
+      <rect width="44" height="44" rx="10" fill="#185FA5"/>
+      <rect x="7" y="8" width="30" height="20" rx="3" fill="none" stroke="#B5D4F4" stroke-width="1.5"/>
+      <rect x="11" y="12" width="8" height="2" rx="1" fill="#85B7EB"/>
+      <rect x="11" y="16" width="14" height="2" rx="1" fill="#85B7EB"/>
+      <rect x="11" y="20" width="10" height="2" rx="1" fill="#85B7EB"/>
+      <rect x="19" y="28" width="6" height="3" rx="1" fill="#B5D4F4"/>
+      <rect x="14" y="31" width="16" height="1.5" rx=".75" fill="#B5D4F4"/>
+    </svg>
+    <div style="font-size:1.5rem;font-weight:700;margin-top:.7rem;background:linear-gradient(135deg,#378ADD,#185FA5);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">짱구's Desk</div>
+    <div style="font-size:.83rem;color:var(--text-muted);margin-top:.3rem;">업무 관리 허브에 오신걸 환영해요 👋</div>
+  </div>
+  <div class="card">
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchTab('login')">로그인</button>
+      <button class="auth-tab" onclick="switchTab('signup')">회원가입</button>
+    </div>
+    <div id="auth-alert"></div>
+    <div id="tab-login">
+      <div class="form-group"><label>이메일</label><input type="email" id="login-email" placeholder="example@email.com"></div>
+      <div class="form-group"><label>비밀번호</label><input type="password" id="login-pw" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <button class="btn btn-primary" onclick="doLogin()">로그인</button>
+    </div>
+    <div id="tab-signup" style="display:none">
+      <div class="form-group"><label>이메일</label><input type="email" id="signup-email"></div>
+      <div class="form-group"><label>비밀번호</label><input type="password" id="signup-pw" placeholder="6자 이상"></div>
+      <button class="btn btn-primary" onclick="doSignup()">회원가입</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+// CSS 주입
+const style = document.createElement('style');
+style.textContent = COMMON_CSS;
+document.head.prepend(style);
+const t = localStorage.getItem('theme') || 'dark';
+document.documentElement.setAttribute('data-theme', t);
+
+// 이미 로그인됐으면 메인으로
+sb.auth.getSession().then(({data:{session}}) => { if (session) window.location.href = 'index.html'; });
+
+function switchTab(tab) {
+  document.querySelectorAll('.auth-tab').forEach((t,i) => t.classList.toggle('active',(tab==='login'&&i===0)||(tab==='signup'&&i===1)));
+  document.getElementById('tab-login').style.display = tab==='login'?'block':'none';
+  document.getElementById('tab-signup').style.display = tab==='signup'?'block':'none';
+  document.getElementById('auth-alert').innerHTML = '';
+}
+async function doLogin() {
+  const { error } = await sb.auth.signInWithPassword({ email: document.getElementById('login-email').value, password: document.getElementById('login-pw').value });
+  if (error) showAlert('auth-alert', error.message, 'error');
+  else window.location.href = 'index.html';
+}
+async function doSignup() {
+  const { error } = await sb.auth.signUp({ email: document.getElementById('signup-email').value, password: document.getElementById('signup-pw').value });
+  if (error) showAlert('auth-alert', error.message, 'error');
+  else showAlert('auth-alert', '가입 완료! 로그인해 주세요.', 'success');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>업로드 — 짱구's Desk</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d1117">
+<link rel="manifest" href="manifest.json">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js"></script>
+<style>
+.upload-area{border:2px dashed var(--border);border-radius:10px;padding:2rem;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:.8rem;}
+.upload-area:hover,.upload-area.drag-over{border-color:var(--accent);background:#378ADD08;}
+.upload-icon{font-size:2.5rem;margin-bottom:.5rem;}
+.upload-text{font-size:.88rem;color:var(--text-muted);}
+.progress-bar{height:4px;background:var(--border);border-radius:2px;margin-top:.5rem;overflow:hidden;}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .3s;}
+.notify-preview{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:1rem;font-size:.84rem;line-height:1.7;white-space:pre-wrap;color:var(--text);margin-bottom:.8rem;}
+.date-group{margin-bottom:1rem;}
+.date-group-header{display:flex;align-items:center;gap:.8rem;padding:.7rem 1rem;background:var(--surface2);border:1px solid var(--border);border-radius:10px 10px 0 0;border-bottom:none;}
+.date-group-title{font-size:.95rem;font-weight:700;flex:1;}
+.exam-type-badge{font-size:.7rem;padding:2px 9px;border-radius:20px;font-weight:600;}
+.type-regular{background:#378ADD18;color:var(--accent);border:1px solid var(--accent);}
+.type-group{background:#4caf8a18;color:var(--success);border:1px solid var(--success);}
+.file-item{display:flex;align-items:center;justify-content:space-between;padding:.8rem 1rem;background:var(--surface);border:1px solid var(--border);border-top:none;gap:.5rem;}
+.date-group .file-item:last-child{border-radius:0 0 10px 10px;}
+.file-info{display:flex;align-items:center;gap:.8rem;flex:1;min-width:0;}
+.file-icon{width:30px;height:30px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:.8rem;flex-shrink:0;}
+.file-name{font-size:.85rem;font-weight:500;}
+.file-size{font-size:.7rem;color:var(--text-muted);}
+.file-memo{font-size:.7rem;color:var(--accent2);}
+</style>
+</head>
+<body>
+<script>
+let allFiles=[], fileMeta={};
+
+window.addEventListener('load', () => {
+  initAuth(() => {
+    // 관리자만 접근
+    if(currentRole !== 'admin') { window.location.href = 'index.html'; return; }
+    initDateSelects();
+    loadUploadedFiles();
+  });
+});
+
+function initDateSelects(){
+  const now=new Date();
+  const y=document.getElementById('upload-year'),m=document.getElementById('upload-month'),d=document.getElementById('upload-day');
+  for(let i=now.getFullYear();i>=now.getFullYear()-2;i--) y.innerHTML+=`<option value="${i}" ${i===now.getFullYear()?'selected':''}>${i}년</option>`;
+  for(let i=1;i<=12;i++){const v=String(i).padStart(2,'0');m.innerHTML+=`<option value="${v}" ${i===now.getMonth()+1?'selected':''}>${v}월</option>`;}
+  for(let i=1;i<=31;i++){const v=String(i).padStart(2,'0');d.innerHTML+=`<option value="${v}" ${i===now.getDate()?'selected':''}>${v}일</option>`;}
+  const days=['일','월','화','수','목','금','토'];
+  document.getElementById('upload-dow').value=days[now.getDay()];
+}
+
+async function loadUploadedFiles(){
+  const{data}=await sb.storage.from('exam-zips').list('',{sortBy:{column:'created_at',order:'desc'}});
+  allFiles=(data||[]).filter(f=>f.name.endsWith('.zip'));
+  const{data:meta}=await sb.from('file_meta').select('*');
+  fileMeta={};
+  (meta||[]).forEach(m=>fileMeta[m.filename]=m);
+  renderUploadedFiles();
+}
+
+function renderUploadedFiles(){
+  const el=document.getElementById('uploaded-files');
+  if(!allFiles.length){el.innerHTML='<div class="empty">업로드된 파일 없음</div>';return;}
+  const groups={};
+  allFiles.forEach(f=>{
+    const meta=fileMeta[f.name];
+    const key=meta?`${meta.year}-${meta.month}-${meta.day}_${meta.type}`:'unknown';
+    if(!groups[key]) groups[key]={meta:meta||null,files:[]};
+    groups[key].files.push({...f,meta:meta||null});
+  });
+  el.innerHTML=Object.values(groups)
+    .sort((a,b)=>{if(!a.meta)return 1;if(!b.meta)return -1;return(`${b.meta.year}${b.meta.month}${b.meta.day}`).localeCompare(`${a.meta.year}${a.meta.month}${a.meta.day}`);})
+    .map(g=>{
+      const meta=g.meta;
+      const typeCls=meta?.type==='정기'?'type-regular':'type-group';
+      const header=meta
+        ?`<div class="date-group-header"><div class="date-group-title">📅 ${meta.year}년 ${meta.month}월 ${meta.day}일 (${meta.day_of_week||''})</div><span class="exam-type-badge ${typeCls}">${meta.type}</span></div>`
+        :`<div class="date-group-header"><div class="date-group-title">📁 기타</div></div>`;
+      const filesHTML=g.files.map(f=>`
+        <div class="file-item">
+          <div class="file-info">
+            <div class="file-icon">📦</div>
+            <div style="min-width:0">
+              <div class="file-name">${f.name.replace(/\.zip$/i,'')}</div>
+              <div style="display:flex;gap:.4rem;margin-top:2px">
+                <span class="file-size">${formatSize(f.metadata?.size)}</span>
+                ${f.meta?.memo?`<span class="file-memo">📝 ${f.meta.memo}</span>`:''}
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="deleteFile('${f.name}')">🗑</button>
+        </div>`).join('');
+      return `<div class="date-group">${header}${filesHTML}</div>`;
+    }).join('');
+}
+
+async function uploadFile(file){
+  if(!file) return;
+  if(!file.name.endsWith('.zip')){showAlert('upload-alert','ZIP 파일만 업로드 가능합니다','error');return;}
+  const year=document.getElementById('upload-year').value;
+  const month=document.getElementById('upload-month').value;
+  const day=document.getElementById('upload-day').value;
+  const dow=document.getElementById('upload-dow').value;
+  const type=document.getElementById('upload-type').value;
+  const memo=document.getElementById('upload-memo').value.trim();
+  const safeName=toSafeName(file.name.replace(/\.zip$/i,''))+'.zip';
+  document.getElementById('upload-progress').style.display='block';
+  document.getElementById('progress-fill').style.width='30%';
+  const{error}=await sb.storage.from('exam-zips').upload(safeName,file,{upsert:true});
+  document.getElementById('progress-fill').style.width='70%';
+  if(error){showAlert('upload-alert','업로드 실패: '+error.message,'error');document.getElementById('upload-progress').style.display='none';return;}
+  await sb.from('file_meta').upsert({filename:safeName,year,month,day,day_of_week:dow,type,memo},{onConflict:'filename'});
+  document.getElementById('progress-fill').style.width='100%';
+  const msg=`📋 시험 자료 안내\n\n${year}년 ${month}월 ${day}일 (${dow}) ${type} 자료가 업로드되었습니다.\n\n파일명: ${safeName}${memo?'\n메모: '+memo:''}\n\n🔗 ${window.location.origin}`;
+  document.getElementById('notify-preview').textContent=msg;
+  document.getElementById('notify-card').style.display='block';
+  showAlert('upload-alert',`✅ ${year}년 ${month}월 ${day}일 (${dow}) ${type} 업로드 완료!`,'success');
+  pushNotify('새 자료 업로드',`${year}년 ${month}월 ${day}일 (${dow}) ${type} 자료가 올라왔습니다.`);
+  document.getElementById('file-input').value='';
+  loadUploadedFiles();
+  setTimeout(()=>{document.getElementById('upload-progress').style.display='none';document.getElementById('progress-fill').style.width='0%';},1500);
+}
+
+async function deleteFile(name){
+  if(!confirm('삭제할까요?')) return;
+  await sb.storage.from('exam-zips').remove([name]);
+  await sb.from('file_meta').delete().eq('filename',name);
+  loadUploadedFiles();
+}
+
+function copyNotify(){navigator.clipboard.writeText(document.getElementById('notify-preview').textContent).then(()=>showToast('✅ 클립보드에 복사됐어요!'));}
+
+// 드래그앤드롭
+window.addEventListener('load',()=>{
+  const area=document.getElementById('upload-area');
+  if(area){
+    area.addEventListener('dragover',e=>{e.preventDefault();area.classList.add('drag-over');});
+    area.addEventListener('dragleave',()=>area.classList.remove('drag-over'));
+    area.addEventListener('drop',e=>{e.preventDefault();area.classList.remove('drag-over');uploadFile(e.dataTransfer.files[0]);});
+  }
+});
+</script>
+
+<div class="container">
+  <div class="card">
+    <h2>📤 파일 업로드</h2>
+    <div id="upload-alert"></div>
+    <div class="form-row" style="flex-wrap:wrap">
+      <div class="form-group" style="min-width:calc(50% - .3rem)"><label>년도</label><select id="upload-year"></select></div>
+      <div class="form-group" style="min-width:calc(50% - .3rem)"><label>월</label><select id="upload-month"></select></div>
+      <div class="form-group" style="min-width:calc(50% - .3rem)"><label>일</label><select id="upload-day"></select></div>
+      <div class="form-group" style="min-width:calc(50% - .3rem)"><label>요일</label>
+        <select id="upload-dow">
+          <option value="월">월</option><option value="화">화</option><option value="수">수</option>
+          <option value="목">목</option><option value="금">금</option><option value="토">토</option><option value="일">일</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group"><label>검정 종류</label>
+      <select id="upload-type"><option value="정기">정기</option><option value="단체">단체</option></select>
+    </div>
+    <div class="form-group"><label>메모 (선택)</label>
+      <input type="text" id="upload-memo" placeholder="예: 1교시만, 수정본 등">
+    </div>
+    <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
+      <div class="upload-icon">📦</div>
+      <div class="upload-text">ZIP 파일을 클릭하거나 드래그해서 업로드</div>
+    </div>
+    <input type="file" id="file-input" accept=".zip" style="display:none" onchange="uploadFile(this.files[0])">
+    <div id="upload-progress" style="display:none">
+      <div style="font-size:.8rem;color:var(--text-muted)">업로드 중...</div>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <div class="card" id="notify-card" style="display:none">
+    <h2>🔔 알림 메시지</h2>
+    <div class="notify-preview" id="notify-preview"></div>
+    <button class="btn btn-copy" style="width:100%;justify-content:center;" onclick="copyNotify()">📋 클립보드에 복사</button>
+  </div>
+
+  <div class="card">
+    <h2>📁 업로드된 파일</h2>
+    <div id="uploaded-files"><div class="empty">불러오는 중...</div></div>
+  </div>
+</div>
+</body>
+</html>

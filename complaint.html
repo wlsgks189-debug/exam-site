@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>민원 템플릿 — 짱구's Desk</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d1117">
+<link rel="manifest" href="manifest.json">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js"></script>
+<style>
+.template-item{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem 1.2rem;margin-bottom:.8rem;transition:border-color .2s;}
+.template-item:hover{border-color:var(--accent);}
+.template-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;}
+.template-category{font-size:.7rem;padding:2px 8px;border-radius:12px;background:#378ADD18;color:var(--accent);border:1px solid var(--accent);}
+.template-title{font-size:.92rem;font-weight:600;margin-bottom:.5rem;}
+.template-body{font-size:.82rem;color:var(--text-muted);line-height:1.65;white-space:pre-wrap;background:var(--bg);border-radius:6px;padding:.75rem;margin-bottom:.7rem;border:1px solid var(--border);}
+.template-vars{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.7rem;}
+.var-input-group{display:flex;flex-direction:column;gap:.2rem;flex:1;min-width:140px;}
+.var-input-group label{font-size:.7rem;}
+.var-input-group input{padding:.35rem .7rem;font-size:.8rem;}
+.filter-bar{display:flex;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap;}
+.filter-bar select{flex:1;min-width:100px;}
+</style>
+</head>
+<body>
+<script>
+let templates = JSON.parse(localStorage.getItem('templates') || '[]');
+
+window.addEventListener('load', () => {
+  initAuth(() => {
+    initDefaultTemplates();
+    renderTemplates();
+    if(currentRole === 'admin') document.getElementById('add-template-card').style.display = 'block';
+  });
+});
+
+function initDefaultTemplates() {
+  if(templates.length > 0) return;
+  templates = [
+    {id:1,category:'이의신청',title:'이의신청 접수 안내',body:'안녕하세요, {이름}님.\n\n{날짜}에 접수하신 이의신청 건에 대해 안내드립니다.\n\n검토 후 영업일 기준 {처리기간}일 이내 결과를 안내해 드릴 예정입니다.\n\n감사합니다.'},
+    {id:2,category:'이의신청',title:'이의신청 결과 안내',body:'안녕하세요, {이름}님.\n\n이의신청 검토 결과를 안내드립니다.\n\n검토 결과: {결과내용}\n\n추가 문의사항은 고객센터로 연락 주시기 바랍니다.\n\n감사합니다.'},
+    {id:3,category:'환불',title:'환불 처리 안내',body:'안녕하세요, {이름}님.\n\n환불 신청이 정상적으로 접수되었습니다.\n\n환불 예정일: {환불일}\n환불 금액: {금액}원\n\n영업일 기준 {처리기간}일 이내 처리될 예정입니다.\n\n감사합니다.'},
+    {id:4,category:'일정문의',title:'시험 일정 안내',body:'안녕하세요, {이름}님.\n\n문의하신 시험 일정을 안내드립니다.\n\n시험일: {시험일}\n장소: {장소}\n시간: {시간}\n\n감사합니다.'},
+    {id:5,category:'합격여부',title:'합격 여부 안내',body:'안녕하세요, {이름}님.\n\n{시험명} 합격 여부를 안내드립니다.\n\n결과: {합격불합격}\n\n자세한 내용은 홈페이지에서 확인하실 수 있습니다.\n\n감사합니다.'},
+  ];
+  saveTemplates();
+}
+function saveTemplates(){localStorage.setItem('templates',JSON.stringify(templates));}
+
+function renderTemplates(){
+  const filter=document.getElementById('tmpl-filter')?.value||'';
+  const cats=[...new Set(templates.map(t=>t.category))];
+  const sel=document.getElementById('tmpl-filter');
+  if(sel){const cur=sel.value;sel.innerHTML='<option value="">전체 카테고리</option>'+cats.map(c=>`<option value="${c}" ${c===cur?'selected':''}>${c}</option>`).join('');}
+  const filtered=filter?templates.filter(t=>t.category===filter):templates;
+  const el=document.getElementById('template-list'); if(!el) return;
+  if(!filtered.length){el.innerHTML='<div class="empty">템플릿이 없습니다</div>';return;}
+  el.innerHTML=filtered.map(t=>{
+    const vars=[...new Set([...t.body.matchAll(/\{([^}]+)\}/g)].map(m=>m[1]))];
+    return `<div class="template-item">
+      <div class="template-header">
+        <span class="template-category">${t.category}</span>
+        ${currentRole==='admin'?`<div style="display:flex;gap:.35rem"><button class="btn btn-outline btn-sm" onclick="editTemplate(${t.id})" style="padding:.2rem .5rem">✏️</button><button class="btn btn-danger btn-sm" onclick="deleteTemplate(${t.id})" style="padding:.2rem .5rem">🗑</button></div>`:''}
+      </div>
+      <div class="template-title">${t.title}</div>
+      <div class="template-body" id="preview_${t.id}">${t.body}</div>
+      ${vars.length?`<div class="template-vars">${vars.map(v=>`<div class="var-input-group"><label>${v}</label><input type="text" id="var_${t.id}_${v.replace(/\W/g,'_')}" placeholder="${v}" oninput="updatePreview(${t.id})"></div>`).join('')}</div>`:''}
+      <button class="btn btn-copy btn-sm" onclick="copyTemplate(${t.id})" style="width:100%;justify-content:center">📋 복사</button>
+    </div>`;
+  }).join('');
+}
+
+function updatePreview(id){
+  const tmpl=templates.find(t=>t.id===id); if(!tmpl) return;
+  let text=tmpl.body;
+  [...new Set([...text.matchAll(/\{([^}]+)\}/g)].map(m=>m[1]))].forEach(v=>{
+    const el=document.getElementById(`var_${id}_${v.replace(/\W/g,'_')}`);
+    if(el&&el.value) text=text.replaceAll(`{${v}}`,el.value);
+  });
+  document.getElementById(`preview_${id}`).textContent=text;
+}
+
+function copyTemplate(id){
+  const el=document.getElementById(`preview_${id}`);
+  if(el) navigator.clipboard.writeText(el.textContent).then(()=>showToast('✅ 답글이 복사됐어요!'));
+}
+
+function saveTemplate(){
+  const cat=document.getElementById('tmpl-cat').value.trim();
+  const title=document.getElementById('tmpl-title').value.trim();
+  const body=document.getElementById('tmpl-body').value.trim();
+  const editId=document.getElementById('tmpl-edit-id').value;
+  if(!cat||!title||!body){showToast('⚠️ 모든 항목을 입력해주세요');return;}
+  if(editId) templates=templates.filter(t=>t.id!=editId);
+  templates.push({id:editId?Number(editId):Date.now(),category:cat,title,body});
+  saveTemplates();
+  ['tmpl-cat','tmpl-title','tmpl-body','tmpl-edit-id'].forEach(id=>document.getElementById(id).value='');
+  renderTemplates(); showToast('✅ 저장됐어요!');
+}
+
+function editTemplate(id){
+  const t=templates.find(t=>t.id===id); if(!t) return;
+  document.getElementById('tmpl-cat').value=t.category;
+  document.getElementById('tmpl-title').value=t.title;
+  document.getElementById('tmpl-body').value=t.body;
+  document.getElementById('tmpl-edit-id').value=t.id;
+  document.getElementById('add-template-card').scrollIntoView({behavior:'smooth'});
+}
+
+function deleteTemplate(id){
+  if(!confirm('삭제할까요?')) return;
+  templates=templates.filter(t=>t.id!==id);
+  saveTemplates(); renderTemplates(); showToast('🗑 삭제됐어요');
+}
+</script>
+
+<div class="container">
+  <div class="card" id="add-template-card" style="display:none">
+    <h2>➕ 템플릿 추가/수정</h2>
+    <div class="form-group"><label>카테고리</label><input type="text" id="tmpl-cat" placeholder="예: 이의신청"></div>
+    <div class="form-group"><label>제목</label><input type="text" id="tmpl-title"></div>
+    <div class="form-group">
+      <label>내용 <span style="color:var(--text-muted);font-size:.72rem">— 변수는 {이름} 형식으로</span></label>
+      <textarea id="tmpl-body" style="min-height:120px"></textarea>
+    </div>
+    <input type="hidden" id="tmpl-edit-id">
+    <button class="btn btn-primary" onclick="saveTemplate()">저장</button>
+  </div>
+
+  <div class="filter-bar">
+    <select id="tmpl-filter" onchange="renderTemplates()"><option value="">전체 카테고리</option></select>
+  </div>
+  <div id="template-list"></div>
+</div>
+</body>
+</html>
