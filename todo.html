@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>할일 — 짱구's Desk</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d1117">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js"></script>
+</head>
+<body>
+<!-- 편집 모달 -->
+<div id="edit-modal" class="modal-overlay" style="display:none">
+  <div class="modal-box">
+    <h2 style="font-size:1.1rem;margin-bottom:1.2rem">✏️ 할일 편집</h2>
+    <input type="hidden" id="edit-todo-id">
+    <div class="form-group"><label>할일 내용</label><textarea id="edit-todo-text" style="min-height:60px;resize:none;" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea></div>
+    <div class="form-row" style="flex-wrap:wrap">
+      <div class="form-group" style="flex:1;min-width:calc(50% - .3rem)"><label>시작</label><select id="edit-todo-start"><option value="">선택</option></select></div>
+      <div class="form-group" style="flex:1;min-width:calc(50% - .3rem)"><label>종료</label><select id="edit-todo-end"><option value="">선택</option></select></div>
+    </div>
+    <div class="form-group"><label>우선순위</label>
+      <select id="edit-todo-priority"><option value="high">🔴 높음</option><option value="medium">🟡 보통</option><option value="low">🟢 낮음</option></select>
+    </div>
+    <div style="display:flex;gap:.7rem;margin-top:.5rem">
+      <button class="btn btn-primary" style="flex:1" onclick="saveTodoEdit()">저장</button>
+      <button class="btn btn-outline" style="flex:1;margin:0" onclick="closeEditModal()">취소</button>
+    </div>
+  </div>
+</div>
+
+<div id="main-section" style="display:none">
+  <div class="container">
+    <!-- 미완료 할일 -->
+    <div class="card" id="incomplete-card" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem">
+        <h2 style="margin:0">⚠️ 미완료 할일</h2>
+        <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" onclick="moveAllToDate('today')">→ 오늘로</button>
+          <button class="btn btn-outline btn-sm" onclick="moveAllToDate('tomorrow')">→ 내일로</button>
+          <button class="btn btn-outline btn-sm" onclick="showMoveDatePicker()">📅 날짜 선택</button>
+        </div>
+      </div>
+      <div id="incomplete-list"></div>
+      <div id="move-date-picker" style="display:none;margin-top:.8rem">
+        <div class="form-row">
+          <div class="form-group" style="flex:2"><label>이동할 날짜</label><input type="date" id="move-target-date"></div>
+          <div class="form-group" style="flex:1;display:flex;align-items:flex-end"><button class="btn btn-success" style="width:100%;margin:0" onclick="moveAllToDate('custom')">이동</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 할일 추가 -->
+    <div class="card">
+      <h2>할일 추가</h2>
+      <div class="form-group"><label>날짜</label><input type="date" id="todo-date" onchange="loadTodos();loadGcal();"></div>
+      <div class="form-row" style="flex-wrap:wrap">
+        <div class="form-group" style="flex:1;min-width:calc(50% - .3rem)"><label>시작 시간</label><select id="todo-start"><option value="">선택</option></select></div>
+        <div class="form-group" style="flex:1;min-width:calc(50% - .3rem)"><label>종료 시간</label><select id="todo-end"><option value="">선택</option></select></div>
+      </div>
+      <div class="form-group"><label>할일 내용</label>
+        <textarea id="todo-input" placeholder="할일을 입력하세요&#10;(Shift+Enter로 줄바꿈)"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();addTodo();}"
+          style="min-height:48px;max-height:120px;resize:none;overflow-y:auto;line-height:1.5;"
+          oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+      </div>
+      <div class="form-group"><label>우선순위</label>
+        <select id="todo-priority"><option value="high">🔴 높음</option><option value="medium" selected>🟡 보통</option><option value="low">🟢 낮음</option></select>
+      </div>
+      <button class="btn btn-primary" onclick="addTodo()">+ 할일 추가</button>
+    </div>
+
+    <!-- 오늘 할일 -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <h2 style="margin:0" id="todo-date-label">오늘 할일</h2>
+        <span id="todo-stats" style="font-size:.75rem;color:var(--text-muted)"></span>
+      </div>
+      <div id="todo-list"><div class="empty">할일이 없습니다</div></div>
+    </div>
+
+    <!-- 구글 캘린더 -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <h2 style="margin:0">📅 구글 캘린더</h2>
+        <button class="btn btn-outline btn-sm" onclick="loadGcal()">새로고침</button>
+      </div>
+      <div id="gcal-setup" style="display:none">
+        <div class="form-group"><label>API 키</label><input type="text" id="gcal-api-key" placeholder="Google API Key"></div>
+        <div class="form-group"><label>캘린더 ID</label><input type="text" id="gcal-cal-id" placeholder="example@gmail.com"></div>
+        <button class="btn btn-primary" onclick="saveGcalSettings()">저장 및 연결</button>
+      </div>
+      <div id="gcal-list">
+        <div class="empty" style="font-size:.82rem">
+          <div style="margin-bottom:.8rem">구글 캘린더를 연동하면 오늘 일정이 표시돼요</div>
+          <button class="btn btn-outline btn-sm" onclick="showGcalSetup()">🔗 캘린더 연동하기</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 히스토리 -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <h2 style="margin:0">📊 완료 히스토리</h2>
+        <select id="history-filter" onchange="loadHistory()" style="width:auto;padding:.3rem .6rem;font-size:.8rem">
+          <option value="month">월별</option>
+          <option value="day">일별</option>
+        </select>
+      </div>
+      <div id="todo-history"><div class="empty">완료된 할일이 없습니다</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const PRIORITY = {
+  high:   { label: '🔴 높음', color: 'var(--danger)',  bg: '#f05e5e18' },
+  medium: { label: '🟡 보통', color: 'var(--warning)', bg: '#f0a04018' },
+  low:    { label: '🟢 낮음', color: 'var(--success)', bg: '#4caf8a18' },
+};
+
+window.addEventListener('DOMContentLoaded', () => {
+  initPage(() => {
+    requestPush();
+    initTodo();
+  });
+});
+
+document.addEventListener('click', e => { if (e.target.id === 'edit-modal') closeEditModal(); });
+
+async function initTodo() {
+  const today = new Date();
+  const dateEl = document.getElementById('todo-date');
+  if (dateEl && !dateEl.value) {
+    dateEl.value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  }
+  initTimeSelects('todo-start', 'todo-end');
+  await Promise.all([loadTodos(), loadIncompleteTodos(), loadHistory()]);
+  loadGcal();
+}
+
+function initTimeSelects(startId, endId) {
+  const s = document.getElementById(startId), e = document.getElementById(endId);
+  if (!s || s.options.length > 1) return;
+  for (let h = 9; h <= 18; h++) {
+    for (let m of ['00', '30']) {
+      if (h === 18 && m === '30') break;
+      const v = `${String(h).padStart(2,'0')}:${m}`;
+      s.innerHTML += `<option value="${v}">${v}</option>`;
+      e.innerHTML += `<option value="${v}">${v}</option>`;
+    }
+  }
+}
+
+async function loadTodos() {
+  const dateVal = document.getElementById('todo-date')?.value;
+  if (!dateVal) return;
+  const [y, m, d] = dateVal.split('-');
+  const days = ['일','월','화','수','목','금','토'];
+  document.getElementById('todo-date-label').textContent = `${y}년 ${m}월 ${d}일 (${days[new Date(dateVal).getDay()]}) 할일`;
+
+  const { data } = await sb.from('todos').select('*')
+    .eq('user_id', currentUser.id).eq('date', dateVal)
+    .order('start_time', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: true });
+
+  const el = document.getElementById('todo-list');
+  if (!data || !data.length) {
+    el.innerHTML = '<div class="empty">할일이 없습니다</div>';
+    document.getElementById('todo-stats').textContent = '';
+    return;
+  }
+  const done = data.filter(t => t.done).length;
+  document.getElementById('todo-stats').textContent = `${done}/${data.length} 완료`;
+
+  const order = { high: 0, medium: 1, low: 2 };
+  data.sort((a, b) => {
+    const pa = order[a.priority || 'medium'], pb = order[b.priority || 'medium'];
+    if (pa !== pb) return pa - pb;
+    if (a.start_time && b.start_time) return a.start_time.localeCompare(b.start_time);
+    return 0;
+  });
+
+  el.innerHTML = data.map(t => {
+    const p = PRIORITY[t.priority || 'medium'];
+    const timeStr = t.start_time ? `${t.start_time}${t.end_time ? ' ~ ' + t.end_time : ''}` : '';
+    return `<div class="todo-item ${t.done ? 'done' : ''}" style="border-left:3px solid ${p.color}">
+      <input type="checkbox" class="todo-check" ${t.done ? 'checked' : ''} onchange="toggleTodo('${t.id}',this.checked)">
+      <div style="flex:1;min-width:0">
+        <div class="todo-text">${t.text}</div>
+        <div style="display:flex;gap:.5rem;margin-top:3px;flex-wrap:wrap">
+          <span style="font-size:.7rem;color:${p.color}">${p.label}</span>
+          ${timeStr ? `<span style="font-size:.7rem;color:var(--text-muted)">⏰ ${timeStr}</span>` : ''}
+          ${t.done ? `<span style="font-size:.7rem;color:var(--text-muted)">✅ ${fmtTime(t.done_at)}</span>` : ''}
+        </div>
+      </div>
+      <div style="display:flex;gap:.3rem">
+        ${!t.done ? `<button class="btn btn-outline btn-sm" onclick="moveTodo('${t.id}','tomorrow')" style="padding:.2rem .4rem" title="내일로">→</button>` : ''}
+        <button class="btn btn-outline btn-sm" onclick="editTodo('${t.id}')" style="padding:.2rem .4rem">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteTodo('${t.id}')" style="padding:.2rem .4rem">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function addTodo() {
+  const input = document.getElementById('todo-input');
+  const dateVal = document.getElementById('todo-date').value;
+  const text = input.value.trim();
+  if (!text || !dateVal) return;
+  const { error } = await sb.from('todos').insert({
+    user_id: currentUser.id, text, date: dateVal,
+    priority: document.getElementById('todo-priority').value,
+    start_time: document.getElementById('todo-start').value || null,
+    end_time: document.getElementById('todo-end').value || null,
+    done: false
+  });
+  if (!error) {
+    input.value = ''; input.style.height = 'auto';
+    document.getElementById('todo-start').value = '';
+    document.getElementById('todo-end').value = '';
+    document.getElementById('todo-priority').value = 'medium';
+    await loadTodos();
+    showToast('✅ 할일 추가됐어요!');
+  }
+}
+
+async function toggleTodo(id, done) {
+  await sb.from('todos').update({ done, done_at: done ? new Date().toISOString() : null }).eq('id', id);
+  await Promise.all([loadTodos(), loadHistory(), loadIncompleteTodos()]);
+  if (done) showToast('🎉 완료! 히스토리에 기록됐어요');
+}
+
+async function deleteTodo(id) {
+  if (!confirm('할일을 삭제할까요?')) return;
+  await sb.from('todos').delete().eq('id', id);
+  await loadTodos();
+}
+
+async function editTodo(id) {
+  const { data } = await sb.from('todos').select('*').eq('id', id).single();
+  if (!data) return;
+  document.getElementById('edit-todo-id').value = data.id;
+  document.getElementById('edit-todo-text').value = data.text;
+  document.getElementById('edit-todo-priority').value = data.priority || 'medium';
+  initTimeSelects('edit-todo-start', 'edit-todo-end');
+  document.getElementById('edit-todo-start').value = data.start_time || '';
+  document.getElementById('edit-todo-end').value = data.end_time || '';
+  document.getElementById('edit-modal').style.display = 'flex';
+}
+
+async function saveTodoEdit() {
+  const id = document.getElementById('edit-todo-id').value;
+  const text = document.getElementById('edit-todo-text').value.trim();
+  if (!text) { showToast('⚠️ 내용을 입력해주세요'); return; }
+  await sb.from('todos').update({
+    text,
+    priority: document.getElementById('edit-todo-priority').value,
+    start_time: document.getElementById('edit-todo-start').value || null,
+    end_time: document.getElementById('edit-todo-end').value || null,
+  }).eq('id', id);
+  closeEditModal();
+  await loadTodos();
+  showToast('✅ 수정됐어요!');
+}
+
+function closeEditModal() { document.getElementById('edit-modal').style.display = 'none'; }
+
+// 미완료 할일
+async function loadIncompleteTodos() {
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const { data } = await sb.from('todos').select('*')
+    .eq('user_id', currentUser.id).eq('done', false).lt('date', todayStr)
+    .order('date', { ascending: false });
+  const card = document.getElementById('incomplete-card');
+  const el = document.getElementById('incomplete-list');
+  if (!data || !data.length) { if (card) card.style.display = 'none'; return; }
+  if (card) card.style.display = 'block';
+  const days = ['일','월','화','수','목','금','토'];
+  el.innerHTML = data.map(t => {
+    const [y, m, d] = t.date.split('-');
+    const p = PRIORITY[t.priority || 'medium'];
+    return `<div class="todo-item" style="border-left:3px solid ${p.color}">
+      <div style="flex:1;min-width:0">
+        <div class="todo-text">${t.text}</div>
+        <div style="font-size:.72rem;color:var(--text-muted);margin-top:2px">${y}년 ${m}월 ${d}일 (${days[new Date(t.date).getDay()]}) · <span style="color:${p.color}">${p.label}</span></div>
+      </div>
+      <div style="display:flex;gap:.3rem;flex-shrink:0">
+        <button class="btn btn-success btn-sm" onclick="moveTodo('${t.id}','today')" style="padding:.25rem .5rem;font-size:.72rem">오늘로</button>
+        <button class="btn btn-outline btn-sm" onclick="moveTodo('${t.id}','tomorrow')" style="padding:.25rem .5rem;font-size:.72rem">내일로</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteTodo('${t.id}')" style="padding:.25rem .5rem;font-size:.72rem">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function moveTodo(id, when) {
+  const today = new Date();
+  let target = new Date(today);
+  if (when === 'tomorrow') target.setDate(target.getDate() + 1);
+  const dateStr = `${target.getFullYear()}-${String(target.getMonth()+1).padStart(2,'0')}-${String(target.getDate()).padStart(2,'0')}`;
+  await sb.from('todos').update({ date: dateStr }).eq('id', id);
+  showToast(`✅ ${when === 'today' ? '오늘' : '내일'}로 이동됐어요!`);
+  await Promise.all([loadTodos(), loadIncompleteTodos()]);
+}
+
+function showMoveDatePicker() {
+  const el = document.getElementById('move-date-picker');
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+async function moveAllToDate(when) {
+  const today = new Date();
+  let target = new Date(today);
+  if (when === 'tomorrow') target.setDate(target.getDate() + 1);
+  else if (when === 'custom') {
+    const dateStr = document.getElementById('move-target-date')?.value;
+    if (!dateStr) { showToast('⚠️ 날짜를 선택해주세요'); return; }
+    target = new Date(dateStr);
+  }
+  const dateStr = `${target.getFullYear()}-${String(target.getMonth()+1).padStart(2,'0')}-${String(target.getDate()).padStart(2,'0')}`;
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const { data } = await sb.from('todos').select('id').eq('user_id', currentUser.id).eq('done', false).lt('date', todayStr);
+  if (!data || !data.length) { showToast('이동할 할일이 없습니다'); return; }
+  await sb.from('todos').update({ date: dateStr }).in('id', data.map(t => t.id));
+  showToast(`✅ ${data.length}개 할일이 이동됐어요!`);
+  document.getElementById('move-date-picker').style.display = 'none';
+  await Promise.all([loadTodos(), loadIncompleteTodos()]);
+}
+
+// 히스토리
+async function loadHistory() {
+  const filter = document.getElementById('history-filter')?.value || 'month';
+  const el = document.getElementById('todo-history');
+  const { data } = await sb.from('todos').select('*')
+    .eq('user_id', currentUser.id).eq('done', true).order('done_at', { ascending: false });
+  if (!data || !data.length) { el.innerHTML = '<div class="empty">완료된 할일이 없습니다</div>'; return; }
+  const days = ['일','월','화','수','목','금','토'];
+  if (filter === 'month') {
+    const groups = {};
+    data.forEach(t => { const [y, m] = t.date.split('-'); const k = `${y}-${m}`; if (!groups[k]) groups[k] = { year: y, month: m, items: [] }; groups[k].items.push(t); });
+    el.innerHTML = Object.entries(groups).sort(([a],[b]) => b.localeCompare(a)).map(([key, g]) => {
+      const dayGroups = {};
+      g.items.forEach(t => { if (!dayGroups[t.date]) dayGroups[t.date] = []; dayGroups[t.date].push(t); });
+      const daysHTML = Object.entries(dayGroups).sort(([a],[b]) => b.localeCompare(a)).map(([date, items]) => {
+        const [y, m, d] = date.split('-');
+        return `<div class="history-day"><div class="history-day-title">📅 ${d}일 (${days[new Date(date).getDay()]}) — ${items.length}건</div>
+          ${items.map(t => { const p = PRIORITY[t.priority || 'medium']; return `<div class="history-item"><span style="color:${p.color};font-size:.8rem">${p.label.split(' ')[0]}</span><span class="history-text">${t.text}</span><span class="history-time">${t.start_time || ''} ${fmtTime(t.done_at)}</span></div>`; }).join('')}
+        </div>`;
+      }).join('');
+      return `<div class="history-month"><div class="history-month-title" onclick="toggleMonth('${key}')">📆 ${g.year}년 ${g.month}월<span class="history-count">${g.items.length}건 완료</span><span class="history-arrow" id="arrow-${key}">▼</span></div><div class="history-month-body" id="month-${key}">${daysHTML}</div></div>`;
+    }).join('');
+  } else {
+    const groups = {};
+    data.forEach(t => { if (!groups[t.date]) groups[t.date] = []; groups[t.date].push(t); });
+    el.innerHTML = Object.entries(groups).sort(([a],[b]) => b.localeCompare(a)).map(([date, items]) => {
+      const [y, m, d] = date.split('-');
+      return `<div class="history-day" style="margin-bottom:.8rem"><div class="history-day-title">📅 ${y}년 ${m}월 ${d}일 (${days[new Date(date).getDay()]}) — ${items.length}건</div>
+        ${items.map(t => { const p = PRIORITY[t.priority || 'medium']; return `<div class="history-item"><span style="color:${p.color};font-size:.8rem">${p.label.split(' ')[0]}</span><span class="history-text">${t.text}</span><span class="history-time">${t.start_time || ''} ${fmtTime(t.done_at)}</span></div>`; }).join('')}
+      </div>`;
+    }).join('');
+  }
+}
+
+function toggleMonth(key) {
+  const body = document.getElementById(`month-${key}`);
+  const arrow = document.getElementById(`arrow-${key}`);
+  if (!body) return;
+  const hidden = body.style.display === 'none';
+  body.style.display = hidden ? 'block' : 'none';
+  if (arrow) arrow.textContent = hidden ? '▼' : '▶';
+}
+
+function fmtTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+// 구글 캘린더
+function showGcalSetup() {
+  document.getElementById('gcal-setup').style.display = 'block';
+  document.getElementById('gcal-list').style.display = 'none';
+  const key = localStorage.getItem('gcal_api_key') || '';
+  const id = localStorage.getItem('gcal_cal_id') || '';
+  if (key) document.getElementById('gcal-api-key').value = key;
+  if (id) document.getElementById('gcal-cal-id').value = id;
+}
+function saveGcalSettings() {
+  const key = document.getElementById('gcal-api-key').value.trim();
+  const id = document.getElementById('gcal-cal-id').value.trim();
+  if (!key || !id) { showToast('⚠️ API 키와 캘린더 ID를 입력해주세요'); return; }
+  localStorage.setItem('gcal_api_key', key);
+  localStorage.setItem('gcal_cal_id', id);
+  document.getElementById('gcal-setup').style.display = 'none';
+  document.getElementById('gcal-list').style.display = 'block';
+  showToast('✅ 저장됐어요!');
+  loadGcal();
+}
+async function loadGcal() {
+  const apiKey = localStorage.getItem('gcal_api_key');
+  const calId = localStorage.getItem('gcal_cal_id');
+  const el = document.getElementById('gcal-list');
+  if (!apiKey || !calId) return;
+  el.innerHTML = '<div class="empty">불러오는 중...</div>';
+  const dateVal = document.getElementById('todo-date')?.value;
+  if (!dateVal) return;
+  try {
+    const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events?key=${apiKey}&timeMin=${dateVal}T00:00:00Z&timeMax=${dateVal}T23:59:59Z&singleEvents=true&orderBy=startTime`);
+    if (!res.ok) { el.innerHTML = `<div class="empty" style="color:var(--danger)">⚠️ 불러오기 실패.<br><button class="btn btn-outline btn-sm" style="margin-top:.5rem" onclick="showGcalSetup()">설정 변경</button></div>`; return; }
+    const data = await res.json();
+    if (!data.items || !data.items.length) { el.innerHTML = '<div class="empty">오늘 일정이 없습니다</div>'; return; }
+    el.innerHTML = data.items.map(ev => {
+      const s = ev.start.dateTime ? new Date(ev.start.dateTime) : null;
+      const e = ev.end.dateTime ? new Date(ev.end.dateTime) : null;
+      const t = s ? `${String(s.getHours()).padStart(2,'0')}:${String(s.getMinutes()).padStart(2,'0')} ~ ${String(e.getHours()).padStart(2,'0')}:${String(e.getMinutes()).padStart(2,'0')}` : '종일';
+      return `<div class="gcal-item"><div class="gcal-time">${t}</div><div class="gcal-title">${ev.summary || '(제목 없음)'}</div>${ev.description ? `<div style="font-size:.75rem;color:var(--text-muted);margin-top:.2rem">${ev.description}</div>` : ''}</div>`;
+    }).join('');
+  } catch (e) { el.innerHTML = `<div class="empty" style="color:var(--danger)">⚠️ 오류: ${e.message}</div>`; }
+}
+</script>
+</body>
+</html>
