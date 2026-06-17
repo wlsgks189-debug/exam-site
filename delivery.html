@@ -19,6 +19,8 @@
 .venue-addr{font-size:.72rem;color:var(--text-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .venue-actions{display:flex;gap:.35rem;flex-shrink:0;}
 .venue-check{width:18px;height:18px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;}
+.qty-input{width:52px;padding:.25rem .4rem;font-size:.82rem;text-align:center;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);}
+.qty-input:focus{outline:none;border-color:var(--accent);}
 .selected-count{font-size:.85rem;color:var(--accent);font-weight:600;}
 .tab-btns{display:flex;gap:.5rem;margin-bottom:1.2rem;border-bottom:1px solid var(--border);}
 .tab-btn{padding:.6rem 1rem;font-size:.88rem;cursor:pointer;border:none;background:none;color:var(--text-muted);font-family:inherit;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s;}
@@ -124,12 +126,21 @@ function renderVenueSelect() {
         <div class="venue-name">${v.name}</div>
         <div class="venue-addr">${v.address || ''}</div>
       </div>
+      <div style="display:flex;align-items:center;gap:.3rem;flex-shrink:0">
+        <span style="font-size:.75rem;color:var(--text-muted)">수량</span>
+        <input type="number" class="qty-input" id="qty-${v.id}" value="1" min="1" max="20">
+      </div>
     </div>`).join('');
 }
 
 function updateSelectedCount() {
-  const cnt = document.querySelectorAll('.venue-check:checked').length;
-  document.getElementById('selected-count').textContent = `${cnt}개 선택`;
+  const checked = document.querySelectorAll('.venue-check:checked');
+  let totalRows = 0;
+  checked.forEach(c => {
+    const qty = parseInt(document.getElementById('qty-' + c.value)?.value) || 1;
+    totalRows += qty;
+  });
+  document.getElementById('selected-count').textContent = `${checked.length}개 선택 (총 ${totalRows}행)`;
 }
 
 function selectAllVenues() { document.querySelectorAll('.venue-check').forEach(c => c.checked = true); updateSelectedCount(); }
@@ -148,9 +159,17 @@ async function exportExcel() {
   const sheetName = `${y}${m}${d}`;
 
   const headers = ['번호','기관명','담당','연락처','우편번호','주소','비고(특이사항)','운임Type'];
-  const rows = selectedVenues.map((v, i) => [
-    i + 1, v.name, v.manager || '', v.phone || '', v.zipcode || '', v.address || '', v.note || '', ''
-  ]);
+
+  // 수량 반영 - 수량만큼 행 복제, 여러 개면 (1)(2)(3) 붙임
+  let rowNum = 1;
+  const rows = [];
+  selectedVenues.forEach(v => {
+    const qty = parseInt(document.getElementById('qty-' + v.id)?.value) || 1;
+    for (let i = 1; i <= qty; i++) {
+      const name = qty > 1 ? `${v.name}(${i})` : v.name;
+      rows.push([rowNum++, name, v.manager || '', v.phone || '', v.zipcode || '', v.address || '', v.note || '', '']);
+    }
+  });
 
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
 
