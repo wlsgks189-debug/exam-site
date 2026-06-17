@@ -47,14 +47,7 @@
             <select id="send-type"><option value="정기">정기</option><option value="단체">단체</option></select>
           </div>
         </div>
-        <div class="form-group"><label>자격증</label>
-          <select id="send-cert">
-            <option value="PC정비사">PC정비사</option>
-            <option value="네트워크관리사">네트워크관리사</option>
-            <option value="지능형홈관리사">지능형홈관리사</option>
-            <option value="영상정보관리사">영상정보관리사</option>
-          </select>
-        </div>
+
       </div>
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
@@ -147,13 +140,12 @@ async function exportExcel() {
   if (!selected.length) { showToast('⚠️ 시험장을 선택해주세요'); return; }
   const date = document.getElementById('send-date').value;
   const type = document.getElementById('send-type').value;
-  const cert = document.getElementById('send-cert').value;
+  if (!date) { showToast('⚠️ 날짜를 선택해주세요'); return; }
   const selectedVenues = venues.filter(v => selected.includes(v.id));
 
-  // 한진택배 양식으로 엑셀 생성
   const wb = XLSX.utils.book_new();
-  const today = new Date(date);
-  const sheetName = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
+  const [y, m, d] = date.split('-');
+  const sheetName = `${y}${m}${d}`;
 
   const headers = ['번호','기관명','담당','연락처','우편번호','주소','비고(특이사항)','운임Type'];
   const rows = selectedVenues.map((v, i) => [
@@ -161,21 +153,46 @@ async function exportExcel() {
   ]);
 
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-  // 컬럼 너비 설정
-  ws['!cols'] = [
-    {wch:6},{wch:30},{wch:12},{wch:16},{wch:8},{wch:60},{wch:20},{wch:10}
-  ];
+
+  // 컬럼 너비
+  ws['!cols'] = [{wch:6},{wch:30},{wch:12},{wch:16},{wch:8},{wch:60},{wch:20},{wch:10}];
+
+  // 행 높이 (헤더 행)
+  ws['!rows'] = [{hpt:20}];
+
+  // 핑크 헤더 스타일 적용
+  const pinkFill = { patternType: 'solid', fgColor: { rgb: 'FFB6C1' } }; // 연핑크
+  const boldFont = { bold: true, name: '맑은 고딕', sz: 11 };
+  const centerAlign = { horizontal: 'center', vertical: 'center' };
+  const borderStyle = { style: 'thin', color: { rgb: '000000' } };
+  const border = { top: borderStyle, bottom: borderStyle, left: borderStyle, right: borderStyle };
+
+  headers.forEach((h, i) => {
+    const cell = XLSX.utils.encode_cell({ r: 0, c: i });
+    if (!ws[cell]) ws[cell] = { v: h, t: 's' };
+    ws[cell].s = { fill: pinkFill, font: boldFont, alignment: centerAlign, border };
+  });
+
+  // 데이터 행 테두리 + 가운데 정렬
+  rows.forEach((row, ri) => {
+    row.forEach((val, ci) => {
+      const cell = XLSX.utils.encode_cell({ r: ri + 1, c: ci });
+      if (!ws[cell]) ws[cell] = { v: val, t: typeof val === 'number' ? 'n' : 's' };
+      ws[cell].s = {
+        alignment: ci === 5 ? { vertical: 'center' } : centerAlign,
+        border
+      };
+    });
+  });
+
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
 
-  // 파일명
-  const [y,m,d] = date.split('-');
-  const fileName = `한진택배_${type}_${m}월_${d}일_${cert}.xlsx`;
+  const fileName = `한진택배_${type}_${m}월_${d}일_물품.xlsx`;
   XLSX.writeFile(wb, fileName);
 
-  // 발송 이력 저장
   await sb.from('delivery_orders').insert({
     user_id: currentUser.id,
-    exam_date: date, exam_type: type, cert,
+    exam_date: date, exam_type: type, cert: '',
     venues: selectedVenues.map(v => ({ id: v.id, name: v.name }))
   });
   showToast('✅ 엑셀 파일이 다운로드됐어요!');
