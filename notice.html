@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>공지사항 메모 — 짱구's Desk</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d1117">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js"></script>
+<style>
+.notice-item{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem 1.2rem;margin-bottom:.8rem;transition:border-color .2s;}
+.notice-item:hover{border-color:var(--accent);}
+.notice-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;}
+.notice-cat{font-size:.7rem;padding:2px 8px;border-radius:12px;background:#378ADD18;color:var(--accent);border:1px solid var(--accent);}
+.notice-title{font-size:.95rem;font-weight:600;margin-bottom:.5rem;}
+.notice-body{font-size:.84rem;line-height:1.75;white-space:pre-wrap;background:var(--bg);border-radius:6px;padding:.8rem;margin-bottom:.7rem;border:1px solid var(--border);color:var(--text);}
+</style>
+</head>
+<body>
+<div id="main-section" style="display:none">
+  <div class="container">
+    <div class="section-title">📣 공지사항 메모</div>
+    <div class="section-sub">자주 쓰는 공지 문구를 저장해서 복사해 사용하세요</div>
+
+    <div class="card" id="notice-form-card">
+      <h2 id="notice-form-title">공지 추가</h2>
+      <input type="hidden" id="notice-edit-id">
+      <div class="form-row" style="flex-wrap:wrap">
+        <div class="form-group" style="flex:2;min-width:200px"><label>제목</label><input type="text" id="notice-title" placeholder="예: 시험 일정 안내"></div>
+        <div class="form-group" style="flex:1;min-width:120px"><label>카테고리</label><input type="text" id="notice-cat" placeholder="예: 공통"></div>
+      </div>
+      <div class="form-group"><label>내용</label><textarea id="notice-body" style="min-height:120px" placeholder="공지 내용을 입력하세요"></textarea></div>
+      <button class="btn btn-primary" onclick="saveNotice()">저장</button>
+    </div>
+
+    <div class="filter-bar">
+      <select id="notice-filter" onchange="loadNotices()"><option value="">전체 카테고리</option></select>
+    </div>
+    <div id="notice-list"><div class="empty">공지사항이 없습니다</div></div>
+  </div>
+</div>
+<script>
+window.addEventListener('DOMContentLoaded', () => {
+  initPage(() => { loadNotices(); });
+});
+
+async function loadNotices() {
+  const filter = document.getElementById('notice-filter').value;
+  const { data } = await sb.from('notices').select('*').eq('user_id', currentUser.id).order('category').order('created_at');
+  const sel = document.getElementById('notice-filter');
+  const cats = [...new Set((data||[]).map(n => n.category))];
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">전체 카테고리</option>' + cats.map(c => `<option value="${c}" ${c===cur?'selected':''}>${c}</option>`).join('');
+  const filtered = filter ? (data||[]).filter(n => n.category === filter) : (data||[]);
+  const el = document.getElementById('notice-list');
+  if (!filtered.length) { el.innerHTML = '<div class="empty">공지사항이 없습니다</div>'; return; }
+  el.innerHTML = filtered.map(n => `
+    <div class="notice-item">
+      <div class="notice-header">
+        <span class="notice-cat">${n.category}</span>
+        <div style="display:flex;gap:.35rem">
+          <button class="btn btn-outline btn-sm" onclick="editNotice('${n.id}')" style="padding:.2rem .4rem">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteNotice('${n.id}')" style="padding:.2rem .4rem">🗑</button>
+        </div>
+      </div>
+      <div class="notice-title">${n.title}</div>
+      <div class="notice-body" id="notice-body-${n.id}">${n.content}</div>
+      <button class="btn btn-copy btn-sm" onclick="copyNotice('${n.id}')" style="width:100%;justify-content:center">📋 복사</button>
+    </div>`).join('');
+}
+
+async function saveNotice() {
+  const title = document.getElementById('notice-title').value.trim();
+  const content = document.getElementById('notice-body').value.trim();
+  const category = document.getElementById('notice-cat').value.trim() || '공통';
+  const editId = document.getElementById('notice-edit-id').value;
+  if (!title || !content) { showToast('⚠️ 제목과 내용을 입력해주세요'); return; }
+  if (editId) {
+    await sb.from('notices').update({ title, content, category }).eq('id', editId);
+    document.getElementById('notice-edit-id').value = '';
+    document.getElementById('notice-form-title').textContent = '공지 추가';
+  } else {
+    await sb.from('notices').insert({ user_id: currentUser.id, title, content, category });
+  }
+  ['notice-title','notice-body','notice-cat'].forEach(id => document.getElementById(id).value = '');
+  showToast('✅ 저장됐어요!'); loadNotices();
+}
+
+function copyNotice(id) {
+  const el = document.getElementById(`notice-body-${id}`);
+  if (el) navigator.clipboard.writeText(el.textContent).then(() => showToast('✅ 복사됐어요!'));
+}
+
+async function editNotice(id) {
+  const { data } = await sb.from('notices').select('*').eq('id', id).single();
+  if (!data) return;
+  document.getElementById('notice-edit-id').value = data.id;
+  document.getElementById('notice-title').value = data.title;
+  document.getElementById('notice-body').value = data.content;
+  document.getElementById('notice-cat').value = data.category;
+  document.getElementById('notice-form-title').textContent = '공지 수정';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function deleteNotice(id) {
+  if (!confirm('삭제할까요?')) return;
+  await sb.from('notices').delete().eq('id', id);
+  showToast('🗑 삭제됐어요'); loadNotices();
+}
+</script>
+</body>
+</html>

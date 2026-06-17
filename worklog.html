@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>업무 일지 — 짱구's Desk</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d1117">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js"></script>
+<style>
+.log-item{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:.8rem;}
+.log-date{font-size:.8rem;color:var(--accent);font-weight:600;margin-bottom:.4rem;}
+.log-content{font-size:.88rem;line-height:1.7;white-space:pre-wrap;}
+.log-meta{display:flex;gap:.8rem;margin-top:.6rem;font-size:.75rem;color:var(--text-muted);}
+.log-actions{display:flex;gap:.4rem;margin-top:.7rem;}
+.month-nav{display:flex;align-items:center;gap:.8rem;margin-bottom:1rem;}
+.month-nav button{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.4rem .8rem;color:var(--text);cursor:pointer;font-family:inherit;font-size:.85rem;}
+.month-nav button:hover{border-color:var(--accent);}
+.month-label{flex:1;text-align:center;font-weight:600;font-size:1rem;}
+</style>
+</head>
+<body>
+<div id="main-section" style="display:none">
+  <div class="container">
+    <div class="section-title">📝 업무 일지</div>
+    <div class="section-sub">날짜별 업무 내용과 민원 처리 건수를 기록하세요</div>
+
+    <!-- 작성 -->
+    <div class="card">
+      <h2 id="log-form-title">오늘 일지 작성</h2>
+      <input type="hidden" id="log-edit-id">
+      <div class="form-group"><label>날짜</label><input type="date" id="log-date"></div>
+      <div class="form-group"><label>업무 내용</label>
+        <textarea id="log-content" style="min-height:120px" placeholder="오늘 처리한 업무 내용을 입력하세요"></textarea>
+      </div>
+      <div class="form-group"><label>민원 처리 건수</label>
+        <input type="number" id="log-complaint-count" placeholder="0" min="0">
+      </div>
+      <button class="btn btn-primary" onclick="saveLog()">저장</button>
+    </div>
+
+    <!-- 월 네비게이션 -->
+    <div class="month-nav">
+      <button onclick="changeMonth(-1)">◀</button>
+      <div class="month-label" id="month-label"></div>
+      <button onclick="changeMonth(1)">▶</button>
+    </div>
+
+    <div id="log-list"><div class="empty">일지가 없습니다</div></div>
+  </div>
+</div>
+<script>
+let currentMonth = new Date();
+
+window.addEventListener('DOMContentLoaded', () => {
+  initPage(() => {
+    const today = new Date();
+    document.getElementById('log-date').value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    updateMonthLabel();
+    loadLogs();
+  });
+});
+
+function updateMonthLabel() {
+  document.getElementById('month-label').textContent = `${currentMonth.getFullYear()}년 ${currentMonth.getMonth()+1}월`;
+}
+
+function changeMonth(dir) {
+  currentMonth.setMonth(currentMonth.getMonth() + dir);
+  updateMonthLabel();
+  loadLogs();
+}
+
+async function loadLogs() {
+  const y = currentMonth.getFullYear();
+  const m = String(currentMonth.getMonth()+1).padStart(2,'0');
+  const { data } = await sb.from('work_logs').select('*').eq('user_id', currentUser.id)
+    .like('date', `${y}-${m}%`).order('date', { ascending: false });
+  const el = document.getElementById('log-list');
+  if (!data || !data.length) { el.innerHTML = '<div class="empty">이달 일지가 없습니다</div>'; return; }
+  const days = ['일','월','화','수','목','금','토'];
+  const totalComplaints = data.reduce((s, l) => s + (l.complaint_count || 0), 0);
+  el.innerHTML = `<div style="font-size:.82rem;color:var(--text-muted);margin-bottom:.8rem">총 ${data.length}건 작성 · 민원 처리 ${totalComplaints}건</div>` +
+    data.map(l => {
+      const [y,m,d] = l.date.split('-');
+      const dow = days[new Date(l.date).getDay()];
+      return `<div class="log-item">
+        <div class="log-date">📅 ${y}년 ${m}월 ${d}일 (${dow})</div>
+        <div class="log-content">${l.content}</div>
+        <div class="log-meta">
+          ${l.complaint_count ? `<span>📨 민원 ${l.complaint_count}건</span>` : ''}
+        </div>
+        <div class="log-actions">
+          <button class="btn btn-outline btn-sm" onclick="editLog('${l.id}')">✏️ 수정</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteLog('${l.id}')">🗑 삭제</button>
+        </div>
+      </div>`;
+    }).join('');
+}
+
+async function saveLog() {
+  const date = document.getElementById('log-date').value;
+  const content = document.getElementById('log-content').value.trim();
+  const count = parseInt(document.getElementById('log-complaint-count').value) || 0;
+  const editId = document.getElementById('log-edit-id').value;
+  if (!date || !content) { showToast('⚠️ 날짜와 내용을 입력해주세요'); return; }
+  if (editId) {
+    await sb.from('work_logs').update({ date, content, complaint_count: count }).eq('id', editId);
+    document.getElementById('log-edit-id').value = '';
+    document.getElementById('log-form-title').textContent = '오늘 일지 작성';
+  } else {
+    await sb.from('work_logs').insert({ user_id: currentUser.id, date, content, complaint_count: count });
+  }
+  document.getElementById('log-content').value = '';
+  document.getElementById('log-complaint-count').value = '';
+  showToast('✅ 저장됐어요!');
+  loadLogs();
+}
+
+async function editLog(id) {
+  const { data } = await sb.from('work_logs').select('*').eq('id', id).single();
+  if (!data) return;
+  document.getElementById('log-edit-id').value = data.id;
+  document.getElementById('log-date').value = data.date;
+  document.getElementById('log-content').value = data.content;
+  document.getElementById('log-complaint-count').value = data.complaint_count || 0;
+  document.getElementById('log-form-title').textContent = '일지 수정';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function deleteLog(id) {
+  if (!confirm('삭제할까요?')) return;
+  await sb.from('work_logs').delete().eq('id', id);
+  showToast('🗑 삭제됐어요');
+  loadLogs();
+}
+</script>
+</body>
+</html>

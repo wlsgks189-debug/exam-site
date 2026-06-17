@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>대시보드 — 짱구's Desk</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d1117">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js"></script>
+<style>
+.dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;}
+.dash-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.2rem;box-shadow:0 2px 8px var(--shadow);}
+.dash-card h3{font-size:.82rem;color:var(--text-muted);margin-bottom:.5rem;font-weight:500;}
+.dash-value{font-size:2rem;font-weight:700;color:var(--accent);}
+.dash-sub{font-size:.75rem;color:var(--text-muted);margin-top:.2rem;}
+.today-section{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.2rem;margin-bottom:1rem;}
+.today-section h2{font-size:1rem;font-weight:600;margin-bottom:.8rem;}
+.today-item{display:flex;align-items:center;gap:.7rem;padding:.5rem 0;border-bottom:1px solid var(--border);font-size:.85rem;}
+.today-item:last-child{border-bottom:none;}
+.today-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.quick-links{display:grid;grid-template-columns:repeat(2,1fr);gap:.6rem;margin-bottom:1rem;}
+.quick-link{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:.9rem;text-align:center;text-decoration:none;color:var(--text);transition:all .2s;display:block;}
+.quick-link:hover{border-color:var(--accent);background:var(--surface2);}
+.quick-link .icon{font-size:1.5rem;margin-bottom:.3rem;}
+.quick-link .label{font-size:.78rem;color:var(--text-muted);}
+.date-header{text-align:center;padding:1.2rem;margin-bottom:1rem;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:12px;color:white;}
+.date-header .date{font-size:1.5rem;font-weight:700;}
+.date-header .day{font-size:.9rem;opacity:.85;margin-top:.2rem;}
+@media(max-width:600px){.dash-grid{grid-template-columns:1fr 1fr;}.quick-links{grid-template-columns:repeat(2,1fr);}}
+</style>
+</head>
+<body>
+<div id="main-section" style="display:none">
+  <div class="container">
+    <!-- 날짜 헤더 -->
+    <div class="date-header" id="date-header"></div>
+
+    <!-- 빠른 이동 -->
+    <div class="quick-links">
+      <a href="index.html" class="quick-link"><div class="icon">📁</div><div class="label">자료실</div></a>
+      <a href="todo.html" class="quick-link"><div class="icon">✅</div><div class="label">할일</div></a>
+      <a href="complaint.html" class="quick-link"><div class="icon">📋</div><div class="label">1:1 문의</div></a>
+      <a href="delivery.html" class="quick-link admin-only"><div class="icon">📦</div><div class="label">택배 발송</div></a>
+      <a href="worklog.html" class="quick-link"><div class="icon">📝</div><div class="label">업무 일지</div></a>
+      <a href="bookmark.html" class="quick-link"><div class="icon">🔖</div><div class="label">북마크</div></a>
+      <a href="complaint_history.html" class="quick-link"><div class="icon">📨</div><div class="label">민원 이력</div></a>
+      <a href="notice.html" class="quick-link"><div class="icon">📣</div><div class="label">공지사항</div></a>
+    </div>
+
+    <!-- 통계 -->
+    <div class="dash-grid">
+      <div class="dash-card">
+        <h3>오늘 할일</h3>
+        <div class="dash-value" id="stat-todo">-</div>
+        <div class="dash-sub" id="stat-todo-sub">로딩 중...</div>
+      </div>
+      <div class="dash-card">
+        <h3>미완료 할일</h3>
+        <div class="dash-value" id="stat-incomplete" style="color:var(--warning)">-</div>
+        <div class="dash-sub">이전 날짜 미완료</div>
+      </div>
+      <div class="dash-card">
+        <h3>이번 달 완료</h3>
+        <div class="dash-value" id="stat-monthly" style="color:var(--success)">-</div>
+        <div class="dash-sub">할일 완료 건수</div>
+      </div>
+      <div class="dash-card">
+        <h3>이번 달 민원</h3>
+        <div class="dash-value" id="stat-complaint" style="color:var(--accent2)">-</div>
+        <div class="dash-sub">민원 이력 건수</div>
+      </div>
+    </div>
+
+    <!-- 오늘 할일 목록 -->
+    <div class="today-section">
+      <h2>✅ 오늘 할일</h2>
+      <div id="today-todos"><div class="empty">할일이 없습니다</div></div>
+    </div>
+
+    <!-- 최근 업로드 파일 -->
+    <div class="today-section">
+      <h2>📁 최근 업로드 파일</h2>
+      <div id="recent-files"><div class="empty">파일이 없습니다</div></div>
+    </div>
+  </div>
+</div>
+<script>
+window.addEventListener('DOMContentLoaded', () => {
+  initPage(() => { initDashboard(); });
+});
+
+async function initDashboard() {
+  // 날짜 헤더
+  const now = new Date();
+  const days = ['일','월','화','수','목','금','토'];
+  const months = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  document.getElementById('date-header').innerHTML = `
+    <div class="date">${now.getFullYear()}년 ${months[now.getMonth()]} ${now.getDate()}일</div>
+    <div class="day">${days[now.getDay()]}요일</div>`;
+
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  const monthStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+
+  // 오늘 할일
+  const { data: todos } = await sb.from('todos').select('*').eq('user_id', currentUser.id).eq('date', todayStr);
+  const done = (todos || []).filter(t => t.done).length;
+  const total = (todos || []).length;
+  document.getElementById('stat-todo').textContent = `${done}/${total}`;
+  document.getElementById('stat-todo-sub').textContent = total > 0 ? `${total - done}개 남음` : '할일 없음';
+
+  // 오늘 할일 목록
+  const PRIORITY = { high: { color: 'var(--danger)', label: '🔴' }, medium: { color: 'var(--warning)', label: '🟡' }, low: { color: 'var(--success)', label: '🟢' } };
+  const todosEl = document.getElementById('today-todos');
+  if (!todos || !todos.length) {
+    todosEl.innerHTML = '<div class="empty">오늘 할일이 없습니다</div>';
+  } else {
+    todosEl.innerHTML = todos.map(t => {
+      const p = PRIORITY[t.priority || 'medium'];
+      return `<div class="today-item">
+        <div class="today-dot" style="background:${p.color}"></div>
+        <span style="${t.done ? 'text-decoration:line-through;color:var(--text-muted)' : ''}">${t.text}</span>
+        ${t.start_time ? `<span style="font-size:.72rem;color:var(--text-muted);margin-left:auto">⏰ ${t.start_time}</span>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  // 미완료 할일
+  const { data: incomplete } = await sb.from('todos').select('id').eq('user_id', currentUser.id).eq('done', false).lt('date', todayStr);
+  document.getElementById('stat-incomplete').textContent = (incomplete || []).length;
+
+  // 이번달 완료
+  const { data: monthly } = await sb.from('todos').select('id').eq('user_id', currentUser.id).eq('done', true).like('date', `${monthStr}%`);
+  document.getElementById('stat-monthly').textContent = (monthly || []).length;
+
+  // 이번달 민원
+  const { data: complaints } = await sb.from('complaints').select('id').eq('user_id', currentUser.id).like('date', `${monthStr}%`);
+  document.getElementById('stat-complaint').textContent = (complaints || []).length;
+
+  // 최근 파일
+  const { data: files } = await sb.storage.from('exam-zips').list('', { sortBy: { column: 'created_at', order: 'desc' }, limit: 5 });
+  const { data: meta } = await sb.from('file_meta').select('*');
+  const fileMeta = {}; (meta || []).forEach(m => fileMeta[m.filename] = m);
+  const filesEl = document.getElementById('recent-files');
+  if (!files || !files.length) {
+    filesEl.innerHTML = '<div class="empty">파일이 없습니다</div>';
+  } else {
+    filesEl.innerHTML = files.filter(f => f.name.endsWith('.zip')).slice(0, 5).map(f => {
+      const m = fileMeta[f.name];
+      return `<div class="today-item">
+        <span style="font-size:1rem">📦</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.84rem;font-weight:500">${f.name.replace(/\.zip$/i,'')}</div>
+          ${m ? `<div style="font-size:.72rem;color:var(--text-muted)">${m.year}년 ${m.month}월 ${m.day}일 (${m.day_of_week||''}) ${m.type}</div>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>북마크 — 짱구's Desk</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d1117">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js"></script>
+<style>
+.bm-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.7rem;margin-bottom:1.2rem;}
+.bm-item{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.9rem;transition:all .2s;position:relative;}
+.bm-item:hover{border-color:var(--accent);}
+.bm-title{font-size:.9rem;font-weight:600;margin-bottom:.3rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.bm-url{font-size:.72rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:.5rem;}
+.bm-cat{font-size:.68rem;padding:2px 7px;border-radius:12px;background:#378ADD18;color:var(--accent);border:1px solid var(--accent);display:inline-block;}
+.bm-actions{display:flex;gap:.3rem;margin-top:.6rem;}
+.cat-header{font-size:.9rem;font-weight:600;color:var(--text-muted);padding:.4rem 0;margin-bottom:.5rem;border-bottom:1px solid var(--border);}
+@media(max-width:600px){.bm-grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div id="main-section" style="display:none">
+  <div class="container">
+    <div class="section-title">🔖 북마크</div>
+    <div class="section-sub">자주 쓰는 사이트를 저장해서 바로 접속하세요</div>
+
+    <div class="card">
+      <h2 id="bm-form-title">북마크 추가</h2>
+      <input type="hidden" id="bm-edit-id">
+      <div class="form-row" style="flex-wrap:wrap">
+        <div class="form-group" style="flex:2;min-width:200px"><label>사이트 이름</label><input type="text" id="bm-title" placeholder="예: ICQA 홈페이지"></div>
+        <div class="form-group" style="flex:1;min-width:120px"><label>카테고리</label><input type="text" id="bm-category" placeholder="예: 업무"></div>
+      </div>
+      <div class="form-group"><label>URL</label><input type="url" id="bm-url" placeholder="https://"></div>
+      <button class="btn btn-primary" onclick="saveBm()">저장</button>
+    </div>
+
+    <div id="bm-list"><div class="empty">북마크가 없습니다</div></div>
+  </div>
+</div>
+<script>
+window.addEventListener('DOMContentLoaded', () => {
+  initPage(() => { loadBookmarks(); });
+});
+
+async function loadBookmarks() {
+  const { data } = await sb.from('bookmarks').select('*').eq('user_id', currentUser.id).order('category').order('sort_order');
+  const el = document.getElementById('bm-list');
+  if (!data || !data.length) { el.innerHTML = '<div class="empty">북마크가 없습니다. 위에서 추가해보세요!</div>'; return; }
+  const groups = {};
+  data.forEach(b => { if (!groups[b.category]) groups[b.category] = []; groups[b.category].push(b); });
+  el.innerHTML = Object.entries(groups).map(([cat, items]) => `
+    <div class="cat-header">${cat}</div>
+    <div class="bm-grid">
+      ${items.map(b => `
+        <div class="bm-item">
+          <div class="bm-title">${b.title}</div>
+          <div class="bm-url">${b.url}</div>
+          <div class="bm-actions">
+            <a href="${b.url}" target="_blank" class="btn btn-success btn-sm" style="flex:1;justify-content:center;text-decoration:none">🔗 열기</a>
+            <button class="btn btn-outline btn-sm" onclick="editBm('${b.id}')">✏️</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteBm('${b.id}')">🗑</button>
+          </div>
+        </div>`).join('')}
+    </div>`).join('');
+}
+
+async function saveBm() {
+  const title = document.getElementById('bm-title').value.trim();
+  const url = document.getElementById('bm-url').value.trim();
+  const category = document.getElementById('bm-category').value.trim() || '기타';
+  const editId = document.getElementById('bm-edit-id').value;
+  if (!title || !url) { showToast('⚠️ 이름과 URL을 입력해주세요'); return; }
+  if (editId) {
+    await sb.from('bookmarks').update({ title, url, category }).eq('id', editId);
+    document.getElementById('bm-edit-id').value = '';
+    document.getElementById('bm-form-title').textContent = '북마크 추가';
+  } else {
+    await sb.from('bookmarks').insert({ user_id: currentUser.id, title, url, category });
+  }
+  ['bm-title','bm-url','bm-category'].forEach(id => document.getElementById(id).value = '');
+  showToast('✅ 저장됐어요!');
+  loadBookmarks();
+}
+
+async function editBm(id) {
+  const { data } = await sb.from('bookmarks').select('*').eq('id', id).single();
+  if (!data) return;
+  document.getElementById('bm-edit-id').value = data.id;
+  document.getElementById('bm-title').value = data.title;
+  document.getElementById('bm-url').value = data.url;
+  document.getElementById('bm-category').value = data.category;
+  document.getElementById('bm-form-title').textContent = '북마크 수정';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function deleteBm(id) {
+  if (!confirm('삭제할까요?')) return;
+  await sb.from('bookmarks').delete().eq('id', id);
+  showToast('🗑 삭제됐어요');
+  loadBookmarks();
+}
+</script>
+</body>
+</html>

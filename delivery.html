@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>택배 발송 — 짱구's Desk</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d1117">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="common.js"></script>
+<style>
+.venue-item{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.9rem 1rem;margin-bottom:.6rem;display:flex;align-items:center;gap:.8rem;}
+.venue-info{flex:1;min-width:0;}
+.venue-name{font-size:.9rem;font-weight:600;}
+.venue-addr{font-size:.72rem;color:var(--text-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.venue-actions{display:flex;gap:.35rem;flex-shrink:0;}
+.venue-check{width:18px;height:18px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;}
+.selected-count{font-size:.85rem;color:var(--accent);font-weight:600;}
+.tab-btns{display:flex;gap:.5rem;margin-bottom:1.2rem;border-bottom:1px solid var(--border);}
+.tab-btn{padding:.6rem 1rem;font-size:.88rem;cursor:pointer;border:none;background:none;color:var(--text-muted);font-family:inherit;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s;}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+</style>
+</head>
+<body>
+<div id="main-section" style="display:none">
+  <div class="container">
+    <div class="section-title">📦 택배 발송 관리</div>
+    <div class="section-sub">시험장 관리 및 한진택배 발송 목록 엑셀 추출</div>
+
+    <div class="tab-btns">
+      <button class="tab-btn active" onclick="switchDelivTab('send')">📤 발송 목록 만들기</button>
+      <button class="tab-btn" onclick="switchDelivTab('venues')">🏫 시험장 관리</button>
+      <button class="tab-btn" onclick="switchDelivTab('history')">📋 발송 이력</button>
+    </div>
+
+    <!-- 발송 목록 -->
+    <div id="dtab-send">
+      <div class="card">
+        <h2>발송 정보</h2>
+        <div class="form-row" style="flex-wrap:wrap">
+          <div class="form-group" style="min-width:calc(50% - .3rem)"><label>시험 날짜</label><input type="date" id="send-date"></div>
+          <div class="form-group" style="min-width:calc(50% - .3rem)"><label>검정 종류</label>
+            <select id="send-type"><option value="정기">정기</option><option value="단체">단체</option></select>
+          </div>
+        </div>
+        <div class="form-group"><label>자격증</label>
+          <select id="send-cert">
+            <option value="PC정비사">PC정비사</option>
+            <option value="네트워크관리사">네트워크관리사</option>
+            <option value="지능형홈관리사">지능형홈관리사</option>
+            <option value="영상정보관리사">영상정보관리사</option>
+          </select>
+        </div>
+      </div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+          <h2 style="margin:0">시험장 선택</h2>
+          <span class="selected-count" id="selected-count">0개 선택</span>
+        </div>
+        <div style="display:flex;gap:.5rem;margin-bottom:.8rem">
+          <button class="btn btn-outline btn-sm" onclick="selectAllVenues()">전체 선택</button>
+          <button class="btn btn-outline btn-sm" onclick="deselectAllVenues()">전체 해제</button>
+        </div>
+        <div id="venue-select-list"><div class="empty">시험장을 먼저 추가해주세요</div></div>
+      </div>
+      <button class="btn btn-primary" onclick="exportExcel()">📊 한진택배 양식으로 엑셀 추출</button>
+    </div>
+
+    <!-- 시험장 관리 -->
+    <div id="dtab-venues" style="display:none">
+      <div class="card">
+        <h2 id="venue-form-title">시험장 추가</h2>
+        <input type="hidden" id="venue-edit-id">
+        <div class="form-row" style="flex-wrap:wrap">
+          <div class="form-group" style="flex:2;min-width:200px"><label>기관명</label><input type="text" id="venue-name" placeholder="예: 선린인터넷고등학교(1)"></div>
+          <div class="form-group" style="flex:1;min-width:120px"><label>우편번호</label><input type="text" id="venue-zipcode" placeholder="예: 04314"></div>
+        </div>
+        <div class="form-group"><label>주소</label><input type="text" id="venue-address" placeholder="전체 주소 입력"></div>
+        <div class="form-row" style="flex-wrap:wrap">
+          <div class="form-group" style="min-width:calc(50% - .3rem)"><label>담당자</label><input type="text" id="venue-manager" placeholder="담당자명"></div>
+          <div class="form-group" style="min-width:calc(50% - .3rem)"><label>연락처</label><input type="text" id="venue-phone" placeholder="010-0000-0000"></div>
+        </div>
+        <div class="form-group"><label>비고</label><input type="text" id="venue-note" placeholder="특이사항"></div>
+        <button class="btn btn-primary" onclick="saveVenue()">저장</button>
+      </div>
+      <div id="venue-list"><div class="empty">시험장이 없습니다</div></div>
+    </div>
+
+    <!-- 발송 이력 -->
+    <div id="dtab-history" style="display:none">
+      <div id="delivery-history"><div class="empty">발송 이력이 없습니다</div></div>
+    </div>
+  </div>
+</div>
+<script>
+let venues = [];
+
+window.addEventListener('DOMContentLoaded', () => {
+  initPage(() => {
+    const today = new Date();
+    document.getElementById('send-date').value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    loadVenues();
+  });
+});
+
+function switchDelivTab(id) {
+  document.querySelectorAll('.tab-btn').forEach((t,i) => t.classList.toggle('active', ['send','venues','history'][i] === id));
+  ['dtab-send','dtab-venues','dtab-history'].forEach(t => document.getElementById(t).style.display = 'none');
+  document.getElementById('dtab-'+id).style.display = 'block';
+  if (id === 'venues') loadVenueList();
+  if (id === 'history') loadDeliveryHistory();
+}
+
+async function loadVenues() {
+  const { data } = await sb.from('exam_venues').select('*').eq('user_id', currentUser.id).order('name');
+  venues = data || [];
+  renderVenueSelect();
+}
+
+function renderVenueSelect() {
+  const el = document.getElementById('venue-select-list');
+  if (!venues.length) { el.innerHTML = '<div class="empty">시험장 관리 탭에서 먼저 추가해주세요</div>'; return; }
+  el.innerHTML = venues.map(v => `
+    <div class="venue-item">
+      <input type="checkbox" class="venue-check" id="vc-${v.id}" value="${v.id}" onchange="updateSelectedCount()">
+      <div class="venue-info">
+        <div class="venue-name">${v.name}</div>
+        <div class="venue-addr">${v.address || ''}</div>
+      </div>
+    </div>`).join('');
+}
+
+function updateSelectedCount() {
+  const cnt = document.querySelectorAll('.venue-check:checked').length;
+  document.getElementById('selected-count').textContent = `${cnt}개 선택`;
+}
+
+function selectAllVenues() { document.querySelectorAll('.venue-check').forEach(c => c.checked = true); updateSelectedCount(); }
+function deselectAllVenues() { document.querySelectorAll('.venue-check').forEach(c => c.checked = false); updateSelectedCount(); }
+
+async function exportExcel() {
+  const selected = [...document.querySelectorAll('.venue-check:checked')].map(c => c.value);
+  if (!selected.length) { showToast('⚠️ 시험장을 선택해주세요'); return; }
+  const date = document.getElementById('send-date').value;
+  const type = document.getElementById('send-type').value;
+  const cert = document.getElementById('send-cert').value;
+  const selectedVenues = venues.filter(v => selected.includes(v.id));
+
+  // 한진택배 양식으로 엑셀 생성
+  const wb = XLSX.utils.book_new();
+  const today = new Date(date);
+  const sheetName = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
+
+  const headers = ['번호','기관명','담당','연락처','우편번호','주소','비고(특이사항)','운임Type'];
+  const rows = selectedVenues.map((v, i) => [
+    i + 1, v.name, v.manager || '', v.phone || '', v.zipcode || '', v.address || '', v.note || '', ''
+  ]);
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  // 컬럼 너비 설정
+  ws['!cols'] = [
+    {wch:6},{wch:30},{wch:12},{wch:16},{wch:8},{wch:60},{wch:20},{wch:10}
+  ];
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+  // 파일명
+  const [y,m,d] = date.split('-');
+  const fileName = `한진택배_${type}_${m}월_${d}일_${cert}.xlsx`;
+  XLSX.writeFile(wb, fileName);
+
+  // 발송 이력 저장
+  await sb.from('delivery_orders').insert({
+    user_id: currentUser.id,
+    exam_date: date, exam_type: type, cert,
+    venues: selectedVenues.map(v => ({ id: v.id, name: v.name }))
+  });
+  showToast('✅ 엑셀 파일이 다운로드됐어요!');
+}
+
+async function loadVenueList() {
+  const { data } = await sb.from('exam_venues').select('*').eq('user_id', currentUser.id).order('name');
+  venues = data || [];
+  const el = document.getElementById('venue-list');
+  if (!venues.length) { el.innerHTML = '<div class="empty">시험장이 없습니다</div>'; return; }
+  el.innerHTML = venues.map(v => `
+    <div class="venue-item">
+      <div class="venue-info">
+        <div class="venue-name">${v.name}</div>
+        <div class="venue-addr">${v.zipcode ? `[${v.zipcode}] ` : ''}${v.address || ''}</div>
+        <div style="font-size:.72rem;color:var(--text-muted);margin-top:2px">${v.manager || ''} ${v.phone || ''}</div>
+      </div>
+      <div class="venue-actions">
+        <button class="btn btn-outline btn-sm" onclick="editVenue('${v.id}')">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteVenue('${v.id}')">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+async function saveVenue() {
+  const name = document.getElementById('venue-name').value.trim();
+  const address = document.getElementById('venue-address').value.trim();
+  const zipcode = document.getElementById('venue-zipcode').value.trim();
+  const manager = document.getElementById('venue-manager').value.trim();
+  const phone = document.getElementById('venue-phone').value.trim();
+  const note = document.getElementById('venue-note').value.trim();
+  const editId = document.getElementById('venue-edit-id').value;
+  if (!name) { showToast('⚠️ 기관명을 입력해주세요'); return; }
+  if (editId) {
+    await sb.from('exam_venues').update({ name, address, zipcode, manager, phone, note }).eq('id', editId);
+    document.getElementById('venue-edit-id').value = '';
+    document.getElementById('venue-form-title').textContent = '시험장 추가';
+  } else {
+    await sb.from('exam_venues').insert({ user_id: currentUser.id, name, address, zipcode, manager, phone, note });
+  }
+  ['venue-name','venue-address','venue-zipcode','venue-manager','venue-phone','venue-note'].forEach(id => document.getElementById(id).value = '');
+  showToast('✅ 저장됐어요!');
+  loadVenueList(); loadVenues();
+}
+
+async function editVenue(id) {
+  const v = venues.find(v => v.id === id); if (!v) return;
+  document.getElementById('venue-edit-id').value = v.id;
+  document.getElementById('venue-name').value = v.name;
+  document.getElementById('venue-address').value = v.address || '';
+  document.getElementById('venue-zipcode').value = v.zipcode || '';
+  document.getElementById('venue-manager').value = v.manager || '';
+  document.getElementById('venue-phone').value = v.phone || '';
+  document.getElementById('venue-note').value = v.note || '';
+  document.getElementById('venue-form-title').textContent = '시험장 수정';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function deleteVenue(id) {
+  if (!confirm('삭제할까요?')) return;
+  await sb.from('exam_venues').delete().eq('id', id);
+  showToast('🗑 삭제됐어요');
+  loadVenueList(); loadVenues();
+}
+
+async function loadDeliveryHistory() {
+  const { data } = await sb.from('delivery_orders').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
+  const el = document.getElementById('delivery-history');
+  if (!data || !data.length) { el.innerHTML = '<div class="empty">발송 이력이 없습니다</div>'; return; }
+  const days = ['일','월','화','수','목','금','토'];
+  el.innerHTML = data.map(d => {
+    const [y,m,day] = d.exam_date.split('-');
+    const dow = days[new Date(d.exam_date).getDay()];
+    const createdAt = new Date(d.created_at);
+    return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:.7rem;">
+      <div style="font-size:.85rem;font-weight:600;margin-bottom:.4rem">${y}년 ${m}월 ${day}일 (${dow}) ${d.exam_type} — ${d.cert}</div>
+      <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:.5rem">${(d.venues||[]).length}개 시험장 · ${createdAt.toLocaleDateString('ko-KR')} 생성</div>
+      <div style="font-size:.78rem;color:var(--text-muted)">${(d.venues||[]).map(v=>v.name).join(', ')}</div>
+    </div>`;
+  }).join('');
+}
+</script>
+</body>
+</html>

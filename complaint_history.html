@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>민원 이력 — 짱구's Desk</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d1117">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js"></script>
+<style>
+.status-badge{font-size:.7rem;padding:2px 9px;border-radius:20px;font-weight:600;}
+.status-접수{background:#f0a04018;color:var(--warning);border:1px solid var(--warning);}
+.status-처리중{background:#378ADD18;color:var(--accent);border:1px solid var(--accent);}
+.status-완료{background:#4caf8a18;color:var(--success);border:1px solid var(--success);}
+.comp-item{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:.7rem;}
+.comp-header{display:flex;align-items:center;gap:.6rem;margin-bottom:.5rem;flex-wrap:wrap;}
+.comp-date{font-size:.78rem;color:var(--text-muted);}
+.comp-cert{font-size:.78rem;font-weight:600;}
+.comp-type{font-size:.78rem;color:var(--text-muted);}
+.comp-content{font-size:.84rem;line-height:1.6;color:var(--text-muted);margin-bottom:.6rem;}
+.comp-actions{display:flex;gap:.4rem;flex-wrap:wrap;}
+.month-nav{display:flex;align-items:center;gap:.8rem;margin-bottom:1rem;}
+.month-nav button{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.4rem .8rem;color:var(--text);cursor:pointer;font-family:inherit;font-size:.85rem;}
+.month-label{flex:1;text-align:center;font-weight:600;}
+.stat-bar{display:flex;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap;}
+.stat-chip{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.4rem .8rem;font-size:.78rem;color:var(--text-muted);}
+.stat-chip span{color:var(--accent);font-weight:600;}
+</style>
+</head>
+<body>
+<div id="main-section" style="display:none">
+  <div class="container">
+    <div class="section-title">📨 민원 이력 관리</div>
+    <div class="section-sub">민원 접수부터 완료까지 이력을 관리하세요</div>
+
+    <!-- 접수 -->
+    <div class="card">
+      <h2 id="comp-form-title">민원 접수</h2>
+      <input type="hidden" id="comp-edit-id">
+      <div class="form-row" style="flex-wrap:wrap">
+        <div class="form-group" style="min-width:calc(50% - .3rem)"><label>날짜</label><input type="date" id="comp-date"></div>
+        <div class="form-group" style="min-width:calc(50% - .3rem)"><label>자격증</label>
+          <select id="comp-cert">
+            <option value="PC정비사">PC정비사</option>
+            <option value="네트워크관리사">네트워크관리사</option>
+            <option value="지능형홈관리사">지능형홈관리사</option>
+            <option value="영상정보관리사">영상정보관리사</option>
+            <option value="기타">기타</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row" style="flex-wrap:wrap">
+        <div class="form-group" style="min-width:calc(50% - .3rem)"><label>민원 유형</label>
+          <select id="comp-type">
+            <option value="이의신청">이의신청</option>
+            <option value="환불">환불</option>
+            <option value="일정문의">일정문의</option>
+            <option value="합격여부">합격여부</option>
+            <option value="기타">기타</option>
+          </select>
+        </div>
+        <div class="form-group" style="min-width:calc(50% - .3rem)"><label>상태</label>
+          <select id="comp-status">
+            <option value="접수">접수</option>
+            <option value="처리중">처리중</option>
+            <option value="완료">완료</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label>내용 (선택)</label><textarea id="comp-content" style="min-height:80px" placeholder="민원 내용 또는 메모"></textarea></div>
+      <button class="btn btn-primary" onclick="saveComplaint()">저장</button>
+    </div>
+
+    <!-- 월 네비 -->
+    <div class="month-nav">
+      <button onclick="changeMonth(-1)">◀</button>
+      <div class="month-label" id="month-label"></div>
+      <button onclick="changeMonth(1)">▶</button>
+    </div>
+
+    <div class="stat-bar" id="stat-bar"></div>
+    <div class="filter-bar">
+      <select id="filter-cert" onchange="loadComplaints()">
+        <option value="">전체 자격증</option>
+        <option value="PC정비사">PC정비사</option>
+        <option value="네트워크관리사">네트워크관리사</option>
+        <option value="지능형홈관리사">지능형홈관리사</option>
+        <option value="영상정보관리사">영상정보관리사</option>
+        <option value="기타">기타</option>
+      </select>
+      <select id="filter-status" onchange="loadComplaints()">
+        <option value="">전체 상태</option>
+        <option value="접수">접수</option>
+        <option value="처리중">처리중</option>
+        <option value="완료">완료</option>
+      </select>
+    </div>
+    <div id="complaint-list"><div class="empty">민원 이력이 없습니다</div></div>
+  </div>
+</div>
+<script>
+let currentMonth = new Date();
+
+window.addEventListener('DOMContentLoaded', () => {
+  initPage(() => {
+    const today = new Date();
+    document.getElementById('comp-date').value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    updateMonthLabel();
+    loadComplaints();
+  });
+});
+
+function updateMonthLabel() {
+  document.getElementById('month-label').textContent = `${currentMonth.getFullYear()}년 ${currentMonth.getMonth()+1}월`;
+}
+function changeMonth(dir) { currentMonth.setMonth(currentMonth.getMonth() + dir); updateMonthLabel(); loadComplaints(); }
+
+async function loadComplaints() {
+  const y = currentMonth.getFullYear();
+  const m = String(currentMonth.getMonth()+1).padStart(2,'0');
+  const cert = document.getElementById('filter-cert').value;
+  const status = document.getElementById('filter-status').value;
+  let query = sb.from('complaints').select('*').eq('user_id', currentUser.id).like('date', `${y}-${m}%`).order('date', { ascending: false });
+  if (cert) query = query.eq('cert', cert);
+  if (status) query = query.eq('status', status);
+  const { data } = await query;
+  const el = document.getElementById('complaint-list');
+
+  // 통계
+  const { data: all } = await sb.from('complaints').select('*').eq('user_id', currentUser.id).like('date', `${y}-${m}%`);
+  const stats = { total: (all||[]).length, 접수: 0, 처리중: 0, 완료: 0 };
+  (all||[]).forEach(c => stats[c.status] = (stats[c.status]||0) + 1);
+  document.getElementById('stat-bar').innerHTML = `
+    <div class="stat-chip">전체 <span>${stats.total}</span>건</div>
+    <div class="stat-chip">접수 <span>${stats.접수||0}</span></div>
+    <div class="stat-chip">처리중 <span>${stats.처리중||0}</span></div>
+    <div class="stat-chip">완료 <span>${stats.완료||0}</span></div>`;
+
+  if (!data || !data.length) { el.innerHTML = '<div class="empty">민원 이력이 없습니다</div>'; return; }
+  const days = ['일','월','화','수','목','금','토'];
+  el.innerHTML = data.map(c => {
+    const [y,m,d] = c.date.split('-');
+    const dow = days[new Date(c.date).getDay()];
+    return `<div class="comp-item">
+      <div class="comp-header">
+        <span class="comp-date">📅 ${y}.${m}.${d}(${dow})</span>
+        <span class="comp-cert">${c.cert}</span>
+        <span class="comp-type">${c.type}</span>
+        <span class="status-badge status-${c.status}">${c.status}</span>
+      </div>
+      ${c.content ? `<div class="comp-content">${c.content}</div>` : ''}
+      <div class="comp-actions">
+        <button class="btn btn-outline btn-sm" onclick="changeStatus('${c.id}','접수')">접수</button>
+        <button class="btn btn-outline btn-sm" onclick="changeStatus('${c.id}','처리중')">처리중</button>
+        <button class="btn btn-success btn-sm" onclick="changeStatus('${c.id}','완료')">완료</button>
+        <button class="btn btn-outline btn-sm" onclick="editComplaint('${c.id}')">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteComplaint('${c.id}')">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function saveComplaint() {
+  const date = document.getElementById('comp-date').value;
+  const cert = document.getElementById('comp-cert').value;
+  const type = document.getElementById('comp-type').value;
+  const status = document.getElementById('comp-status').value;
+  const content = document.getElementById('comp-content').value.trim();
+  const editId = document.getElementById('comp-edit-id').value;
+  if (!date) { showToast('⚠️ 날짜를 입력해주세요'); return; }
+  if (editId) {
+    await sb.from('complaints').update({ date, cert, type, status, content }).eq('id', editId);
+    document.getElementById('comp-edit-id').value = '';
+    document.getElementById('comp-form-title').textContent = '민원 접수';
+  } else {
+    await sb.from('complaints').insert({ user_id: currentUser.id, date, cert, type, status, content });
+  }
+  document.getElementById('comp-content').value = '';
+  showToast('✅ 저장됐어요!'); loadComplaints();
+}
+
+async function changeStatus(id, status) {
+  await sb.from('complaints').update({ status }).eq('id', id);
+  showToast(`✅ ${status}으로 변경됐어요`); loadComplaints();
+}
+
+async function editComplaint(id) {
+  const { data } = await sb.from('complaints').select('*').eq('id', id).single();
+  if (!data) return;
+  document.getElementById('comp-edit-id').value = data.id;
+  document.getElementById('comp-date').value = data.date;
+  document.getElementById('comp-cert').value = data.cert;
+  document.getElementById('comp-type').value = data.type;
+  document.getElementById('comp-status').value = data.status;
+  document.getElementById('comp-content').value = data.content || '';
+  document.getElementById('comp-form-title').textContent = '민원 수정';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function deleteComplaint(id) {
+  if (!confirm('삭제할까요?')) return;
+  await sb.from('complaints').delete().eq('id', id);
+  showToast('🗑 삭제됐어요'); loadComplaints();
+}
+</script>
+</body>
+</html>

@@ -221,10 +221,16 @@ const NAV_HTML = `
   </div>
 </nav>
 <div class="page-tabs">
+  <a href="dashboard.html" class="page-tab">🏠 홈</a>
   <a href="index.html" class="page-tab">📁 자료실</a>
   <a href="upload.html" class="page-tab admin-only">📤 업로드</a>
-  <a href="complaint.html" class="page-tab">📋 1:1 문의 답변</a>
   <a href="todo.html" class="page-tab">✅ 할일</a>
+  <a href="complaint.html" class="page-tab">📋 1:1 문의</a>
+  <a href="complaint_history.html" class="page-tab">📨 민원 이력</a>
+  <a href="worklog.html" class="page-tab">📝 업무 일지</a>
+  <a href="bookmark.html" class="page-tab">🔖 북마크</a>
+  <a href="notice.html" class="page-tab">📣 공지사항</a>
+  <a href="delivery.html" class="page-tab admin-only">📦 택배 발송</a>
 </div>
 `;
 
