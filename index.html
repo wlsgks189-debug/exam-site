@@ -337,6 +337,25 @@ tr:last-child td{border-bottom:none;}
           </div>
           <button class="btn btn-primary" onclick="addTodo()">+ 할일 추가</button>
         </div>
+        <!-- 미완료 할일 -->
+        <div class="card" id="incomplete-card" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+            <h2 style="margin:0">⚠️ 미완료 할일</h2>
+            <div style="display:flex;gap:.4rem">
+              <button class="btn btn-outline btn-sm" onclick="moveAllToDate('tomorrow')">→ 내일로</button>
+              <button class="btn btn-outline btn-sm" onclick="moveAllToDate('today')">→ 오늘로</button>
+              <button class="btn btn-outline btn-sm" onclick="showMoveDatePicker()">📅 날짜 선택</button>
+            </div>
+          </div>
+          <div id="incomplete-list"></div>
+          <div id="move-date-picker" style="display:none;margin-top:.8rem">
+            <div class="form-row">
+              <div class="form-group" style="flex:2"><label>이동할 날짜</label><input type="date" id="move-target-date"></div>
+              <div class="form-group" style="flex:1;display:flex;align-items:flex-end"><button class="btn btn-success" style="width:100%;margin:0" onclick="moveAllToDate('custom')">이동</button></div>
+            </div>
+          </div>
+        </div>
+
         <div class="card">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
             <h2 style="margin:0" id="todo-date-label">오늘 할일</h2>
@@ -584,7 +603,7 @@ function copyComplaint(){
 async function initTodo(){
   const today=new Date();const dateEl=document.getElementById('todo-date');
   if(dateEl&&!dateEl.value)dateEl.value=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-  initTimeSelects('todo-start','todo-end');await loadTodos();await loadHistory();loadGcal();
+  initTimeSelects('todo-start','todo-end');await loadTodos();await loadHistory();await loadIncompleteTodos();loadGcal();
 }
 function initTimeSelects(startId,endId){
   const start=document.getElementById(startId),end=document.getElementById(endId);if(!start||start.options.length>1)return;
@@ -602,7 +621,8 @@ async function loadTodos(){
   const sorted=[...data].sort((a,b)=>{const pa=order[a.priority||'medium'],pb=order[b.priority||'medium'];if(pa!==pb)return pa-pb;if(a.start_time&&b.start_time)return a.start_time.localeCompare(b.start_time);return 0;});
   el.innerHTML=sorted.map(t=>{
     const p=PRIORITY[t.priority||'medium'],timeStr=t.start_time?`${t.start_time}${t.end_time?' ~ '+t.end_time:''}` :'';
-    return `<div class="todo-item ${t.done?'done':''}" style="border-left:3px solid ${p.color}"><input type="checkbox" class="todo-check" ${t.done?'checked':''} onchange="toggleTodo('${t.id}',this.checked)"><div style="flex:1;min-width:0"><div class="todo-text">${t.text}</div><div style="display:flex;gap:.5rem;margin-top:3px;flex-wrap:wrap"><span style="font-size:.7rem;color:${p.color}">${p.label}</span>${timeStr?`<span style="font-size:.7rem;color:var(--text-muted)">⏰ ${timeStr}</span>`:''}${t.done?`<span style="font-size:.7rem;color:var(--text-muted)">✅ ${formatDoneTime(t.done_at)}</span>`:''}</div></div><div style="display:flex;gap:.3rem"><button class="btn btn-outline btn-sm" onclick="editTodo('${t.id}')" style="padding:.2rem .4rem">✏️</button><button class="btn btn-danger btn-sm" onclick="deleteTodo('${t.id}')" style="padding:.2rem .4rem">🗑</button></div></div>`;
+    return `<div class="todo-item ${t.done?'done':''}" style="border-left:3px solid ${p.color}"><input type="checkbox" class="todo-check" ${t.done?'checked':''} onchange="toggleTodo('${t.id}',this.checked)"><div style="flex:1;min-width:0"><div class="todo-text">${t.text}</div><div style="display:flex;gap:.5rem;margin-top:3px;flex-wrap:wrap"><span style="font-size:.7rem;color:${p.color}">${p.label}</span>${timeStr?`<span style="font-size:.7rem;color:var(--text-muted)">⏰ ${timeStr}</span>`:''}${t.done?`<span style="font-size:.7rem;color:var(--text-muted)">✅ ${formatDoneTime(t.done_at)}</span>`:''}</div></div><div style="display:flex;gap:.3rem">${!t.done?`<button class="btn btn-outline btn-sm" onclick="moveTodo('${t.id}','tomorrow')" style="padding:.2rem .4rem" title="내일로">→</button>`:''}
+      <button class="btn btn-outline btn-sm" onclick="editTodo('${t.id}')" style="padding:.2rem .4rem">✏️</button><button class="btn btn-danger btn-sm" onclick="deleteTodo('${t.id}')" style="padding:.2rem .4rem">🗑</button></div></div>`;
   }).join('');
 }
 async function addTodo(){
@@ -611,7 +631,7 @@ async function addTodo(){
   const{error}=await sb.from('todos').insert({user_id:currentUser.id,text,date:dateVal,priority,start_time,end_time,done:false});
   if(!error){input.value='';input.style.height='auto';document.getElementById('todo-start').value='';document.getElementById('todo-end').value='';document.getElementById('todo-priority').value='medium';await loadTodos();showToast('✅ 할일 추가됐어요!');}
 }
-async function toggleTodo(id,done){await sb.from('todos').update({done,done_at:done?new Date().toISOString():null}).eq('id',id);await loadTodos();await loadHistory();if(done)showToast('🎉 완료! 히스토리에 기록됐어요');}
+async function toggleTodo(id,done){await sb.from('todos').update({done,done_at:done?new Date().toISOString():null}).eq('id',id);await loadTodos();await loadHistory();await loadIncompleteTodos();if(done)showToast('🎉 완료! 히스토리에 기록됐어요');}
 async function deleteTodo(id){if(!confirm('할일을 삭제할까요?'))return;await sb.from('todos').delete().eq('id',id);await loadTodos();}
 async function editTodo(id){
   const{data}=await sb.from('todos').select('*').eq('id',id).single();if(!data)return;
@@ -652,6 +672,79 @@ async function loadHistory(){
 }
 function toggleHistoryMonth(key){const body=document.getElementById(`month-${key}`),arrow=document.getElementById(`arrow-${key}`);if(!body)return;const isHidden=body.style.display==='none';body.style.display=isHidden?'block':'none';if(arrow)arrow.textContent=isHidden?'▼':'▶';}
 function formatDoneTime(isoStr){if(!isoStr)return'';const d=new Date(isoStr);return`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}
+
+// 미완료 할일
+async function loadIncompleteTodos(){
+  const today=new Date();
+  const todayStr=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const{data}=await sb.from('todos').select('*').eq('user_id',currentUser.id).eq('done',false).lt('date',todayStr).order('date',{ascending:false});
+  const card=document.getElementById('incomplete-card');
+  const el=document.getElementById('incomplete-list');
+  if(!data||!data.length){if(card)card.style.display='none';return;}
+  if(card)card.style.display='block';
+  const days=['일','월','화','수','목','금','토'];
+  el.innerHTML=data.map(t=>{
+    const[y,m,d]=t.date.split('-'),dow=days[new Date(t.date).getDay()];
+    const p=PRIORITY[t.priority||'medium'];
+    return `<div class="todo-item" style="border-left:3px solid ${p.color}">
+      <div style="flex:1;min-width:0">
+        <div class="todo-text">${t.text}</div>
+        <div style="font-size:.72rem;color:var(--text-muted);margin-top:2px">${y}년 ${m}월 ${d}일 (${dow}) · <span style="color:${p.color}">${p.label}</span></div>
+      </div>
+      <div style="display:flex;gap:.3rem;flex-shrink:0">
+        <button class="btn btn-success btn-sm" onclick="moveTodo('${t.id}','today')" style="padding:.25rem .5rem;font-size:.72rem">오늘로</button>
+        <button class="btn btn-outline btn-sm" onclick="moveTodo('${t.id}','tomorrow')" style="padding:.25rem .5rem;font-size:.72rem">내일로</button>
+        <button class="btn btn-outline btn-sm" onclick="moveTodoCustom('${t.id}')" style="padding:.25rem .5rem;font-size:.72rem">📅</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteTodo('${t.id}')" style="padding:.25rem .5rem;font-size:.72rem">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function moveTodo(id,when){
+  const today=new Date();
+  let target;
+  if(when==='today') target=new Date(today);
+  else if(when==='tomorrow'){target=new Date(today);target.setDate(target.getDate()+1);}
+  else return;
+  const dateStr=`${target.getFullYear()}-${String(target.getMonth()+1).padStart(2,'0')}-${String(target.getDate()).padStart(2,'0')}`;
+  await sb.from('todos').update({date:dateStr}).eq('id',id);
+  showToast(`✅ ${when==='today'?'오늘':'내일'}로 이동됐어요!`);
+  await loadTodos();await loadIncompleteTodos();
+}
+
+async function moveTodoCustom(id){
+  const dateStr=prompt('이동할 날짜를 입력하세요 (예: 2026-06-20)');
+  if(!dateStr||!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)){if(dateStr)showToast('⚠️ 날짜 형식을 확인해주세요');return;}
+  await sb.from('todos').update({date:dateStr}).eq('id',id);
+  showToast('✅ 날짜가 이동됐어요!');
+  await loadTodos();await loadIncompleteTodos();
+}
+
+function showMoveDatePicker(){
+  const el=document.getElementById('move-date-picker');
+  if(el)el.style.display=el.style.display==='none'?'block':'none';
+}
+
+async function moveAllToDate(when){
+  const today=new Date();
+  let target;
+  if(when==='today') target=new Date(today);
+  else if(when==='tomorrow'){target=new Date(today);target.setDate(target.getDate()+1);}
+  else if(when==='custom'){
+    const dateStr=document.getElementById('move-target-date')?.value;
+    if(!dateStr){showToast('⚠️ 날짜를 선택해주세요');return;}
+    target=new Date(dateStr);
+  }
+  const dateStr=`${target.getFullYear()}-${String(target.getMonth()+1).padStart(2,'0')}-${String(target.getDate()).padStart(2,'0')}`;
+  const todayStr=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const{data}=await sb.from('todos').select('id').eq('user_id',currentUser.id).eq('done',false).lt('date',todayStr);
+  if(!data||!data.length){showToast('이동할 할일이 없습니다');return;}
+  await sb.from('todos').update({date:dateStr}).in('id',data.map(t=>t.id));
+  showToast(`✅ ${data.length}개 할일이 이동됐어요!`);
+  document.getElementById('move-date-picker').style.display='none';
+  await loadTodos();await loadIncompleteTodos();
+}
 
 // 구글 캘린더
 function showGcalSetup(){document.getElementById('gcal-setup').style.display='block';document.getElementById('gcal-list').style.display='none';const key=localStorage.getItem('gcal_api_key')||'',id=localStorage.getItem('gcal_cal_id')||'';if(key)document.getElementById('gcal-api-key').value=key;if(id)document.getElementById('gcal-cal-id').value=id;}
