@@ -19,7 +19,12 @@
 .bm-url{font-size:.72rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:.5rem;}
 .bm-cat{font-size:.68rem;padding:2px 7px;border-radius:12px;background:#378ADD18;color:var(--accent);border:1px solid var(--accent);display:inline-block;}
 .bm-actions{display:flex;gap:.3rem;margin-top:.6rem;}
-.cat-header{font-size:.9rem;font-weight:600;color:var(--text-muted);padding:.4rem 0;margin-bottom:.5rem;border-bottom:1px solid var(--border);}
+.cat-section{background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:.8rem;overflow:hidden;}
+.cat-toggle{display:flex;align-items:center;justify-content:space-between;padding:.9rem 1.1rem;cursor:pointer;font-size:.95rem;font-weight:600;transition:background .2s;}
+.cat-toggle:hover{background:var(--surface2);}
+.cat-count{font-size:.75rem;color:var(--text-muted);font-weight:400;}
+.cat-arrow{font-size:.75rem;color:var(--text-muted);transition:transform .2s;}
+.cat-body{padding:.8rem;border-top:1px solid var(--border);}
 @media(max-width:600px){.bm-grid{grid-template-columns:1fr;}}
 </style>
 </head>
@@ -54,20 +59,44 @@ async function loadBookmarks() {
   if (!data || !data.length) { el.innerHTML = '<div class="empty">북마크가 없습니다. 위에서 추가해보세요!</div>'; return; }
   const groups = {};
   data.forEach(b => { if (!groups[b.category]) groups[b.category] = []; groups[b.category].push(b); });
-  el.innerHTML = Object.entries(groups).map(([cat, items]) => `
-    <div class="cat-header">${cat}</div>
-    <div class="bm-grid">
-      ${items.map(b => `
-        <div class="bm-item">
-          <div class="bm-title">${b.title}</div>
-          <div class="bm-url">${b.url}</div>
-          <div class="bm-actions">
-            <a href="${b.url}" target="_blank" class="btn btn-success btn-sm" style="flex:1;justify-content:center;text-decoration:none">🔗 열기</a>
-            <button class="btn btn-outline btn-sm" onclick="editBm('${b.id}')">✏️</button>
-            <button class="btn btn-danger btn-sm" onclick="deleteBm('${b.id}')">🗑</button>
-          </div>
-        </div>`).join('')}
-    </div>`).join('');
+  const savedOpen = JSON.parse(localStorage.getItem('bm_open') || '{}');
+  el.innerHTML = Object.entries(groups).map(([cat, items]) => {
+    const isOpen = savedOpen[cat] !== false; // 기본 펼침
+    const catId = 'cat_' + cat.replace(/\s/g,'_');
+    return `<div class="cat-section">
+      <div class="cat-toggle" onclick="toggleCat('${catId}','${cat}')">
+        <span>${cat} <span class="cat-count">${items.length}개</span></span>
+        <span class="cat-arrow" id="arrow_${catId}">${isOpen ? '▼' : '▶'}</span>
+      </div>
+      <div class="cat-body" id="${catId}" style="display:${isOpen ? 'block' : 'none'}">
+        <div class="bm-grid">
+          ${items.map(b => `
+            <div class="bm-item">
+              <div class="bm-title">${b.title}</div>
+              <div class="bm-url">${b.url}</div>
+              <div class="bm-actions">
+                <a href="${b.url}" target="_blank" class="btn btn-success btn-sm" style="flex:1;justify-content:center;text-decoration:none">🔗 열기</a>
+                <button class="btn btn-outline btn-sm" onclick="editBm('${b.id}')">✏️</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteBm('${b.id}')">🗑</button>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleCat(id, cat) {
+  const body = document.getElementById(id);
+  const arrow = document.getElementById('arrow_' + id);
+  if (!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  if (arrow) arrow.textContent = isOpen ? '▶' : '▼';
+  // 상태 저장
+  const saved = JSON.parse(localStorage.getItem('bm_open') || '{}');
+  saved[cat] = !isOpen;
+  localStorage.setItem('bm_open', JSON.stringify(saved));
 }
 
 async function saveBm() {
