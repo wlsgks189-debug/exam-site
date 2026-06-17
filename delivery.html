@@ -268,11 +268,23 @@ async function loadDeliveryHistory() {
     const dow = days[new Date(d.exam_date).getDay()];
     const createdAt = new Date(d.created_at);
     return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:.7rem;">
-      <div style="font-size:.85rem;font-weight:600;margin-bottom:.4rem">${y}년 ${m}월 ${day}일 (${dow}) ${d.exam_type} — ${d.cert}</div>
-      <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:.5rem">${(d.venues||[]).length}개 시험장 · ${createdAt.toLocaleDateString('ko-KR')} 생성</div>
-      <div style="font-size:.78rem;color:var(--text-muted)">${(d.venues||[]).map(v=>v.name).join(', ')}</div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.85rem;font-weight:600;margin-bottom:.4rem">${y}년 ${m}월 ${day}일 (${dow}) ${d.exam_type}</div>
+          <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:.5rem">${(d.venues||[]).length}개 시험장 · ${createdAt.toLocaleDateString('ko-KR')} 생성</div>
+          <div style="font-size:.78rem;color:var(--text-muted)">${(d.venues||[]).map(v=>v.name).join(', ')}</div>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="deleteDelivery('${d.id}')" style="flex-shrink:0;padding:.25rem .5rem">🗑</button>
+      </div>
     </div>`;
   }).join('');
+}
+
+async function deleteDelivery(id) {
+  if (!confirm('발송 이력을 삭제할까요?')) return;
+  await sb.from('delivery_orders').delete().eq('id', id);
+  showToast('🗑 삭제됐어요');
+  loadDeliveryHistory();
 }
 </script>
 </body>
