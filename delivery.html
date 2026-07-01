@@ -25,6 +25,12 @@
 .tab-btns{display:flex;gap:.5rem;margin-bottom:1.2rem;border-bottom:1px solid var(--border);}
 .tab-btn{padding:.6rem 1rem;font-size:.88rem;cursor:pointer;border:none;background:none;color:var(--text-muted);font-family:inherit;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s;}
 .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+.cat-section{background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:.8rem;overflow:hidden;}
+.cat-toggle{display:flex;align-items:center;justify-content:space-between;padding:.9rem 1.1rem;cursor:pointer;font-size:.95rem;font-weight:600;transition:background .2s;}
+.cat-toggle:hover{background:var(--surface2);}
+.cat-count{font-size:.75rem;color:var(--text-muted);font-weight:400;}
+.cat-arrow{font-size:.75rem;color:var(--text-muted);transition:transform .2s;}
+.cat-body{padding:.8rem;border-top:1px solid var(--border);}
 </style>
 </head>
 <body>
@@ -34,35 +40,58 @@
     <div class="section-sub">시험장 관리 및 한진택배 발송 목록 엑셀 추출</div>
 
     <div class="tab-btns">
-      <button class="tab-btn active" onclick="switchDelivTab('send')">📤 발송 목록 만들기</button>
+      <button class="tab-btn active" onclick="switchDelivTab('folders')">📁 폴더</button>
       <button class="tab-btn" onclick="switchDelivTab('venues')">🏫 시험장 관리</button>
       <button class="tab-btn" onclick="switchDelivTab('history')">📋 발송 이력</button>
     </div>
 
-    <!-- 발송 목록 -->
-    <div id="dtab-send">
+    <!-- 폴더 -->
+    <div id="dtab-folders">
       <div class="card">
-        <h2>발송 정보</h2>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+          <h2 style="margin:0">📁 발송 폴더</h2>
+          <button class="btn btn-primary btn-sm" style="margin:0;width:auto" onclick="openNewFolderModal()">+ 새 폴더</button>
+        </div>
+        <div class="form-group" style="margin-bottom:1rem">
+          <input type="text" id="folder-search" placeholder="🔍 폴더 이름으로 검색 (예: 06/27)" oninput="renderFolders()">
+        </div>
+        <div id="folder-year-list"><div class="empty">저장된 폴더가 없습니다</div></div>
+      </div>
+    </div>
+
+    <!-- 폴더 편집 모달 -->
+    <div id="folder-modal" class="modal-overlay" style="display:none">
+      <div class="modal-box" style="max-width:640px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem">
+          <h2 style="margin:0;font-size:1.1rem" id="folder-modal-title">새 폴더</h2>
+          <button class="btn btn-outline btn-sm" onclick="closeFolderModal()" style="padding:.3rem .6rem">✕</button>
+        </div>
+        <input type="hidden" id="folder-id">
         <div class="form-row" style="flex-wrap:wrap">
-          <div class="form-group" style="min-width:calc(50% - .3rem)"><label>시험 날짜</label><input type="date" id="send-date"></div>
-          <div class="form-group" style="min-width:calc(50% - .3rem)"><label>검정 종류</label>
-            <select id="send-type"><option value="정기">정기</option><option value="단체">단체</option></select>
+          <div class="form-group" style="flex:2;min-width:160px"><label>폴더 이름</label><input type="text" id="folder-name-input" oninput="this.dataset.edited='1'"></div>
+          <div class="form-group" style="flex:1;min-width:120px"><label>시험 날짜</label><input type="date" id="folder-date-input" onchange="suggestFolderName()"></div>
+          <div class="form-group" style="flex:1;min-width:100px"><label>종류</label>
+            <select id="folder-type-input" onchange="suggestFolderName()"><option value="정기">정기</option><option value="단체">단체</option></select>
           </div>
         </div>
 
-      </div>
-      <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-          <h2 style="margin:0">시험장 선택</h2>
-          <span class="selected-count" id="selected-count">0개 선택</span>
+        <div class="form-group">
+          <label>시험장 검색해서 담기</label>
+          <input type="text" id="folder-venue-search" placeholder="🔍 시험장 이름 또는 주소" oninput="renderFolderVenueSearch()">
         </div>
-        <div style="display:flex;gap:.5rem;margin-bottom:.8rem">
-          <button class="btn btn-outline btn-sm" onclick="selectAllVenues()">전체 선택</button>
-          <button class="btn btn-outline btn-sm" onclick="deselectAllVenues()">전체 해제</button>
+        <div id="folder-venue-search-results" style="max-height:170px;overflow-y:auto;margin-bottom:1.2rem"></div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+          <label style="margin:0">담긴 시험장 (<span id="folder-venue-count">0</span>개)</label>
+          <button class="btn btn-outline btn-sm" onclick="clearFolderVenues()">전체 비우기</button>
         </div>
-        <div id="venue-select-list"><div class="empty">시험장을 먼저 추가해주세요</div></div>
+        <div id="folder-venue-list" style="max-height:240px;overflow-y:auto;margin-bottom:1.2rem"><div class="empty">담긴 시험장이 없습니다</div></div>
+
+        <div style="display:flex;gap:.7rem">
+          <button class="btn btn-success" style="flex:1;margin:0" onclick="saveFolderData()">💾 저장</button>
+          <button class="btn btn-primary" style="flex:1;margin:0" onclick="exportFolderExcel()">📊 엑셀 추출</button>
+        </div>
       </div>
-      <button class="btn btn-primary" onclick="exportExcel()">📊 한진택배 양식으로 엑셀 추출</button>
     </div>
 
     <!-- 시험장 관리 -->
@@ -93,18 +122,22 @@
 </div>
 <script>
 let venues = [];
+let folders = [];
+let folderDraftVenues = [];
+let editingFolderId = null;
 
 window.addEventListener('DOMContentLoaded', () => {
   initPage(() => {
-    const today = new Date();
-    document.getElementById('send-date').value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
     loadVenues();
+    loadFolders();
   });
 });
 
+document.addEventListener('click', e => { if (e.target.id === 'folder-modal') closeFolderModal(); });
+
 function switchDelivTab(id) {
-  document.querySelectorAll('.tab-btn').forEach((t,i) => t.classList.toggle('active', ['send','venues','history'][i] === id));
-  ['dtab-send','dtab-venues','dtab-history'].forEach(t => document.getElementById(t).style.display = 'none');
+  document.querySelectorAll('.tab-btn').forEach((t,i) => t.classList.toggle('active', ['folders','venues','history'][i] === id));
+  ['dtab-folders','dtab-venues','dtab-history'].forEach(t => document.getElementById(t).style.display = 'none');
   document.getElementById('dtab-'+id).style.display = 'block';
   if (id === 'venues') loadVenueList();
   if (id === 'history') loadDeliveryHistory();
@@ -113,107 +146,272 @@ function switchDelivTab(id) {
 async function loadVenues() {
   const { data } = await sb.from('exam_venues').select('*').eq('user_id', currentUser.id).order('name');
   venues = data || [];
-  renderVenueSelect();
 }
 
-function renderVenueSelect() {
-  const el = document.getElementById('venue-select-list');
-  if (!venues.length) { el.innerHTML = '<div class="empty">시험장 관리 탭에서 먼저 추가해주세요</div>'; return; }
-  el.innerHTML = venues.map(v => `
-    <div class="venue-item">
-      <input type="checkbox" class="venue-check" id="vc-${v.id}" value="${v.id}" onchange="updateSelectedCount()">
+async function loadFolders() {
+  const { data } = await sb.from('delivery_folders').select('*').eq('user_id', currentUser.id).order('exam_date', { ascending: false });
+  folders = data || [];
+  renderFolders();
+}
+
+function renderFolders() {
+  const q = (document.getElementById('folder-search')?.value || '').trim().toLowerCase();
+  const filtered = q ? folders.filter(f => f.name.toLowerCase().includes(q)) : folders;
+  const el = document.getElementById('folder-year-list');
+  if (!filtered.length) { el.innerHTML = '<div class="empty">저장된 폴더가 없습니다</div>'; return; }
+  const groups = {};
+  filtered.forEach(f => {
+    const year = (f.exam_date || '').slice(0,4) || '기타';
+    if (!groups[year]) groups[year] = [];
+    groups[year].push(f);
+  });
+  const years = Object.keys(groups).sort((a,b) => b.localeCompare(a));
+  const savedOpen = JSON.parse(localStorage.getItem('deliv_folder_year_open') || '{}');
+  el.innerHTML = years.map(year => {
+    const items = groups[year].sort((a,b) => (b.exam_date||'').localeCompare(a.exam_date||''));
+    const isOpen = savedOpen[year] !== false;
+    return `<div class="cat-section">
+      <div class="cat-toggle" onclick="toggleFolderYear('${year}')">
+        <span>${year}년 <span class="cat-count">${items.length}개</span></span>
+        <span class="cat-arrow" id="fyarrow_${year}">${isOpen ? '▼' : '▶'}</span>
+      </div>
+      <div class="cat-body" id="fyear_${year}" style="display:${isOpen ? 'block' : 'none'}">
+        ${items.map(f => {
+          const parts = (f.exam_date||'').split('-');
+          const md = parts.length === 3 ? `${parts[1]}/${parts[2]}` : '';
+          return `<div class="venue-item">
+            <div class="venue-info">
+              <div class="venue-name">📁 ${f.name}</div>
+              <div class="venue-addr">${md} ${f.exam_type||''} · ${(f.venues||[]).length}개 시험장</div>
+            </div>
+            <div class="venue-actions">
+              <button class="btn btn-outline btn-sm" onclick="openFolder('${f.id}')">📂 열기</button>
+              <button class="btn btn-success btn-sm" onclick="exportFolderExcelById('${f.id}')">📊 추출</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteFolder('${f.id}')">🗑</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleFolderYear(year) {
+  const body = document.getElementById('fyear_' + year);
+  const arrow = document.getElementById('fyarrow_' + year);
+  if (!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  if (arrow) arrow.textContent = isOpen ? '▶' : '▼';
+  const saved = JSON.parse(localStorage.getItem('deliv_folder_year_open') || '{}');
+  saved[year] = !isOpen;
+  localStorage.setItem('deliv_folder_year_open', JSON.stringify(saved));
+}
+
+async function deleteFolder(id) {
+  if (!confirm('폴더를 삭제할까요?')) return;
+  await sb.from('delivery_folders').delete().eq('id', id);
+  showToast('🗑 삭제됐어요');
+  loadFolders();
+}
+
+function openNewFolderModal() {
+  editingFolderId = null;
+  folderDraftVenues = [];
+  const today = new Date();
+  document.getElementById('folder-date-input').value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  document.getElementById('folder-type-input').value = '정기';
+  document.getElementById('folder-name-input').value = '';
+  document.getElementById('folder-name-input').dataset.edited = '';
+  document.getElementById('folder-modal-title').textContent = '새 폴더';
+  suggestFolderName();
+  document.getElementById('folder-venue-search').value = '';
+  renderFolderVenueSearch();
+  renderFolderVenueList();
+  document.getElementById('folder-modal').style.display = 'flex';
+}
+
+function openFolder(id) {
+  const f = folders.find(x => x.id === id);
+  if (!f) return;
+  editingFolderId = id;
+  folderDraftVenues = (f.venues || []).map(v => ({ ...v, _key: v.name + '_' + Math.random().toString(36).slice(2) }));
+  document.getElementById('folder-date-input').value = f.exam_date || '';
+  document.getElementById('folder-type-input').value = f.exam_type || '정기';
+  document.getElementById('folder-name-input').value = f.name;
+  document.getElementById('folder-name-input').dataset.edited = '1';
+  document.getElementById('folder-modal-title').textContent = '폴더 편집';
+  document.getElementById('folder-venue-search').value = '';
+  renderFolderVenueSearch();
+  renderFolderVenueList();
+  document.getElementById('folder-modal').style.display = 'flex';
+}
+
+function closeFolderModal() {
+  document.getElementById('folder-modal').style.display = 'none';
+}
+
+function suggestFolderName() {
+  const nameEl = document.getElementById('folder-name-input');
+  if (nameEl.dataset.edited === '1') return;
+  const date = document.getElementById('folder-date-input').value;
+  const type = document.getElementById('folder-type-input').value;
+  if (!date) return;
+  const [, m, d] = date.split('-');
+  nameEl.value = `${m}/${d}(${type})`;
+}
+
+function renderFolderVenueSearch() {
+  const q = (document.getElementById('folder-venue-search').value || '').trim().toLowerCase();
+  const el = document.getElementById('folder-venue-search-results');
+  if (!venues.length) { el.innerHTML = '<div class="empty">등록된 시험장이 없습니다. 시험장 관리 탭에서 먼저 추가해주세요</div>'; return; }
+  const addedKeys = new Set(folderDraftVenues.map(v => v.name + '|' + (v.address||'')));
+  let list = venues;
+  if (q) list = list.filter(v => (v.name||'').toLowerCase().includes(q) || (v.address||'').toLowerCase().includes(q));
+  if (!list.length) { el.innerHTML = '<div class="empty">검색 결과가 없습니다</div>'; return; }
+  el.innerHTML = list.slice(0, 50).map(v => {
+    const already = addedKeys.has(v.name + '|' + (v.address||''));
+    return `<div class="venue-item" style="padding:.6rem .8rem">
       <div class="venue-info">
-        <div class="venue-name">${v.name}</div>
+        <div class="venue-name" style="font-size:.84rem">${v.name}</div>
         <div class="venue-addr">${v.address || ''}</div>
       </div>
-      <div style="display:flex;align-items:center;gap:.3rem;flex-shrink:0">
-        <span style="font-size:.75rem;color:var(--text-muted)">수량</span>
-        <input type="number" class="qty-input" id="qty-${v.id}" value="1" min="1" max="20">
+      <button class="btn ${already ? 'btn-outline' : 'btn-success'} btn-sm" ${already ? 'disabled' : ''} onclick="addVenueToFolder('${v.id}')">${already ? '✓ 담김' : '+ 담기'}</button>
+    </div>`;
+  }).join('');
+}
+
+function addVenueToFolder(venueId) {
+  const v = venues.find(x => x.id === venueId);
+  if (!v) return;
+  folderDraftVenues.push({
+    name: v.name, address: v.address||'', zipcode: v.zipcode||'',
+    manager: v.manager||'', phone: v.phone||'', note: v.note||'',
+    qty: 1, _key: venueId + '_' + Date.now()
+  });
+  renderFolderVenueList();
+  renderFolderVenueSearch();
+}
+
+function renderFolderVenueList() {
+  const el = document.getElementById('folder-venue-list');
+  document.getElementById('folder-venue-count').textContent = folderDraftVenues.length;
+  if (!folderDraftVenues.length) { el.innerHTML = '<div class="empty">담긴 시험장이 없습니다</div>'; return; }
+  el.innerHTML = folderDraftVenues.map(v => `
+    <div class="venue-item" style="padding:.6rem .8rem">
+      <div class="venue-info">
+        <div class="venue-name" style="font-size:.84rem">${v.name}</div>
+        <div class="venue-addr">${v.address || ''}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:.4rem;flex-shrink:0">
+        <span style="font-size:.72rem;color:var(--text-muted)">수량</span>
+        <input type="number" class="qty-input" value="${v.qty}" min="1" max="20" onchange="updateFolderVenueQty('${v._key}', this.value)">
+        <button class="btn btn-danger btn-sm" onclick="removeVenueFromFolder('${v._key}')">✕</button>
       </div>
     </div>`).join('');
 }
 
-function updateSelectedCount() {
-  const checked = document.querySelectorAll('.venue-check:checked');
-  let totalRows = 0;
-  checked.forEach(c => {
-    const qty = parseInt(document.getElementById('qty-' + c.value)?.value) || 1;
-    totalRows += qty;
-  });
-  document.getElementById('selected-count').textContent = `${checked.length}개 선택 (총 ${totalRows}행)`;
+function updateFolderVenueQty(key, val) {
+  const v = folderDraftVenues.find(x => x._key === key);
+  if (v) v.qty = parseInt(val) || 1;
 }
 
-function selectAllVenues() { document.querySelectorAll('.venue-check').forEach(c => c.checked = true); updateSelectedCount(); }
-function deselectAllVenues() { document.querySelectorAll('.venue-check').forEach(c => c.checked = false); updateSelectedCount(); }
+function removeVenueFromFolder(key) {
+  folderDraftVenues = folderDraftVenues.filter(x => x._key !== key);
+  renderFolderVenueList();
+  renderFolderVenueSearch();
+}
 
-async function exportExcel() {
-  const selected = [...document.querySelectorAll('.venue-check:checked')].map(c => c.value);
-  if (!selected.length) { showToast('⚠️ 시험장을 선택해주세요'); return; }
-  const date = document.getElementById('send-date').value;
-  const type = document.getElementById('send-type').value;
-  if (!date) { showToast('⚠️ 날짜를 선택해주세요'); return; }
-  const selectedVenues = venues.filter(v => selected.includes(v.id));
+function clearFolderVenues() {
+  folderDraftVenues = [];
+  renderFolderVenueList();
+  renderFolderVenueSearch();
+}
 
+async function saveFolderData() {
+  const name = document.getElementById('folder-name-input').value.trim();
+  const date = document.getElementById('folder-date-input').value;
+  const type = document.getElementById('folder-type-input').value;
+  if (!name) { showToast('⚠️ 폴더 이름을 입력해주세요'); return; }
+  if (!date) { showToast('⚠️ 시험 날짜를 선택해주세요'); return; }
+  const payload = {
+    user_id: currentUser.id,
+    name, exam_date: date, exam_type: type,
+    venues: folderDraftVenues.map(({_key, ...rest}) => rest)
+  };
+  if (editingFolderId) {
+    await sb.from('delivery_folders').update(payload).eq('id', editingFolderId);
+  } else {
+    const { data } = await sb.from('delivery_folders').insert(payload).select().single();
+    editingFolderId = data?.id || null;
+  }
+  showToast('✅ 폴더가 저장됐어요!');
+  await loadFolders();
+}
+
+function buildDeliveryExcel(date, type, venueRows) {
   const wb = XLSX.utils.book_new();
   const [y, m, d] = date.split('-');
   const sheetName = `${y}${m}${d}`;
-
   const headers = ['번호','기관명','담당','연락처','우편번호','주소','비고(특이사항)','운임Type'];
-
-  // 수량 반영 - 수량만큼 행 복제, 여러 개면 (1)(2)(3) 붙임
   let rowNum = 1;
   const rows = [];
-  selectedVenues.forEach(v => {
-    const qty = parseInt(document.getElementById('qty-' + v.id)?.value) || 1;
+  venueRows.forEach(v => {
+    const qty = parseInt(v.qty) || 1;
     for (let i = 1; i <= qty; i++) {
       const name = qty > 1 ? `${v.name}(${i})` : v.name;
       rows.push([rowNum++, name, v.manager || '', v.phone || '', v.zipcode || '', v.address || '', v.note || '', '']);
     }
   });
-
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-
-  // 컬럼 너비
   ws['!cols'] = [{wch:6},{wch:30},{wch:12},{wch:16},{wch:8},{wch:60},{wch:20},{wch:10}];
-
-  // 행 높이 (헤더 행)
   ws['!rows'] = [{hpt:20}];
-
-  // 핑크 헤더 스타일 적용
-  const pinkFill = { patternType: 'solid', fgColor: { rgb: 'FFB6C1' } }; // 연핑크
+  const pinkFill = { patternType: 'solid', fgColor: { rgb: 'FFB6C1' } };
   const boldFont = { bold: true, name: '맑은 고딕', sz: 11 };
   const centerAlign = { horizontal: 'center', vertical: 'center' };
   const borderStyle = { style: 'thin', color: { rgb: '000000' } };
   const border = { top: borderStyle, bottom: borderStyle, left: borderStyle, right: borderStyle };
-
   headers.forEach((h, i) => {
     const cell = XLSX.utils.encode_cell({ r: 0, c: i });
     if (!ws[cell]) ws[cell] = { v: h, t: 's' };
     ws[cell].s = { fill: pinkFill, font: boldFont, alignment: centerAlign, border };
   });
-
-  // 데이터 행 테두리 + 가운데 정렬
   rows.forEach((row, ri) => {
     row.forEach((val, ci) => {
       const cell = XLSX.utils.encode_cell({ r: ri + 1, c: ci });
       if (!ws[cell]) ws[cell] = { v: val, t: typeof val === 'number' ? 'n' : 's' };
-      ws[cell].s = {
-        alignment: ci === 5 ? { vertical: 'center' } : centerAlign,
-        border
-      };
+      ws[cell].s = { alignment: ci === 5 ? { vertical: 'center' } : centerAlign, border };
     });
   });
-
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
-
   const fileName = `한진택배_${type}_${m}월_${d}일_물품.xlsx`;
   XLSX.writeFile(wb, fileName);
+}
 
+async function recordDeliveryHistory(date, type, venueRows) {
   await sb.from('delivery_orders').insert({
     user_id: currentUser.id,
     exam_date: date, exam_type: type, cert: '',
-    venues: selectedVenues.map(v => ({ id: v.id, name: v.name }))
+    venues: venueRows.map(v => ({ name: v.name }))
   });
+}
+
+async function exportFolderExcel() {
+  if (!folderDraftVenues.length) { showToast('⚠️ 담긴 시험장이 없습니다'); return; }
+  const date = document.getElementById('folder-date-input').value;
+  const type = document.getElementById('folder-type-input').value;
+  if (!date) { showToast('⚠️ 시험 날짜를 선택해주세요'); return; }
+  buildDeliveryExcel(date, type, folderDraftVenues);
+  await recordDeliveryHistory(date, type, folderDraftVenues);
+  showToast('✅ 엑셀 파일이 다운로드됐어요!');
+}
+
+async function exportFolderExcelById(id) {
+  const f = folders.find(x => x.id === id);
+  if (!f) return;
+  if (!f.venues || !f.venues.length) { showToast('⚠️ 담긴 시험장이 없습니다'); return; }
+  buildDeliveryExcel(f.exam_date, f.exam_type, f.venues);
+  await recordDeliveryHistory(f.exam_date, f.exam_type, f.venues);
   showToast('✅ 엑셀 파일이 다운로드됐어요!');
 }
 
