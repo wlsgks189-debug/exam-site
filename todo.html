@@ -26,6 +26,7 @@
     <div class="form-group"><label>우선순위</label>
       <select id="edit-todo-priority"><option value="high">🔴 높음</option><option value="medium">🟡 보통</option><option value="low">🟢 낮음</option></select>
     </div>
+    <div class="form-group"><label>연결 프로젝트 (선택)</label><select id="edit-todo-project"><option value="">없음</option></select></div>
     <div style="display:flex;gap:.7rem;margin-top:.5rem">
       <button class="btn btn-primary" style="flex:1" onclick="saveTodoEdit()">저장</button>
       <button class="btn btn-outline" style="flex:1;margin:0" onclick="closeEditModal()">취소</button>
@@ -71,14 +72,18 @@
       <div class="form-group"><label>우선순위</label>
         <select id="todo-priority"><option value="high">🔴 높음</option><option value="medium" selected>🟡 보통</option><option value="low">🟢 낮음</option></select>
       </div>
+      <div class="form-group"><label>연결 프로젝트 (선택)</label><select id="todo-project"><option value="">없음</option></select></div>
       <button class="btn btn-primary" onclick="addTodo()">+ 할일 추가</button>
     </div>
 
     <!-- 오늘 할일 -->
     <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem">
         <h2 style="margin:0" id="todo-date-label">오늘 할일</h2>
-        <span id="todo-stats" style="font-size:.75rem;color:var(--text-muted)"></span>
+        <div style="display:flex;align-items:center;gap:.6rem">
+          <select id="todo-project-filter" onchange="loadTodos()" style="width:auto;padding:.3rem .6rem;font-size:.8rem"><option value="">전체 프로젝트</option></select>
+          <span id="todo-stats" style="font-size:.75rem;color:var(--text-muted)"></span>
+        </div>
       </div>
       <div id="todo-list"><div class="empty">할일이 없습니다</div></div>
     </div>
@@ -122,6 +127,7 @@ const PRIORITY = {
   medium: { label: '🟡 보통', color: 'var(--warning)', bg: '#f0a04018' },
   low:    { label: '🟢 낮음', color: 'var(--success)', bg: '#4caf8a18' },
 };
+let projectMap = {}; // id -> title
 
 window.addEventListener('DOMContentLoaded', () => {
   initPage(() => {
@@ -139,8 +145,23 @@ async function initTodo() {
     dateEl.value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
   }
   initTimeSelects('todo-start', 'todo-end');
+  await loadProjectOptions();
   await Promise.all([loadTodos(), loadIncompleteTodos(), loadHistory()]);
   loadGcal();
+}
+
+async function loadProjectOptions() {
+  const { data } = await sb.from('long_projects').select('id, title, status')
+    .eq('user_id', currentUser.id).in('status', ['planning', 'active']).order('title');
+  projectMap = {};
+  (data || []).forEach(p => projectMap[p.id] = p.title);
+  const opts = '<option value="">없음</option>' + (data || []).map(p => `<option value="${p.id}">${p.title}</option>`).join('');
+  const addSel = document.getElementById('todo-project');
+  const editSel = document.getElementById('edit-todo-project');
+  if (addSel) addSel.innerHTML = opts;
+  if (editSel) editSel.innerHTML = opts;
+  const filterSel = document.getElementById('todo-project-filter');
+  if (filterSel) filterSel.innerHTML = '<option value="">전체 프로젝트</option>' + (data || []).map(p => `<option value="${p.id}">${p.title}</option>`).join('');
 }
 
 function initTimeSelects(startId, endId) {
@@ -163,10 +184,13 @@ async function loadTodos() {
   const days = ['일','월','화','수','목','금','토'];
   document.getElementById('todo-date-label').textContent = `${y}년 ${m}월 ${d}일 (${days[new Date(dateVal).getDay()]}) 할일`;
 
-  const { data } = await sb.from('todos').select('*')
+  const projectFilter = document.getElementById('todo-project-filter')?.value;
+  let query = sb.from('todos').select('*')
     .eq('user_id', currentUser.id).eq('date', dateVal)
     .order('start_time', { ascending: true, nullsFirst: false })
     .order('created_at', { ascending: true });
+  if (projectFilter) query = query.eq('project_id', projectFilter);
+  const { data } = await query;
 
   const el = document.getElementById('todo-list');
   if (!data || !data.length) {
@@ -188,6 +212,7 @@ async function loadTodos() {
   el.innerHTML = data.map(t => {
     const p = PRIORITY[t.priority || 'medium'];
     const timeStr = t.start_time ? `${t.start_time}${t.end_time ? ' ~ ' + t.end_time : ''}` : '';
+    const projName = t.project_id ? projectMap[t.project_id] : null;
     return `<div class="todo-item ${t.done ? 'done' : ''}" style="border-left:3px solid ${p.color}">
       <input type="checkbox" class="todo-check" ${t.done ? 'checked' : ''} onchange="toggleTodo('${t.id}',this.checked)">
       <div style="flex:1;min-width:0">
@@ -195,6 +220,7 @@ async function loadTodos() {
         <div style="display:flex;gap:.5rem;margin-top:3px;flex-wrap:wrap">
           <span style="font-size:.7rem;color:${p.color}">${p.label}</span>
           ${timeStr ? `<span style="font-size:.7rem;color:var(--text-muted)">⏰ ${timeStr}</span>` : ''}
+          ${projName ? `<span style="font-size:.7rem;color:var(--accent)">🚀 ${projName}</span>` : ''}
           ${t.done ? `<span style="font-size:.7rem;color:var(--text-muted)">✅ ${fmtTime(t.done_at)}</span>` : ''}
         </div>
       </div>
@@ -217,6 +243,7 @@ async function addTodo() {
     priority: document.getElementById('todo-priority').value,
     start_time: document.getElementById('todo-start').value || null,
     end_time: document.getElementById('todo-end').value || null,
+    project_id: document.getElementById('todo-project').value || null,
     done: false
   });
   if (!error) {
@@ -224,6 +251,7 @@ async function addTodo() {
     document.getElementById('todo-start').value = '';
     document.getElementById('todo-end').value = '';
     document.getElementById('todo-priority').value = 'medium';
+    document.getElementById('todo-project').value = '';
     await loadTodos();
     showToast('✅ 할일 추가됐어요!');
   }
@@ -247,6 +275,7 @@ async function editTodo(id) {
   document.getElementById('edit-todo-id').value = data.id;
   document.getElementById('edit-todo-text').value = data.text;
   document.getElementById('edit-todo-priority').value = data.priority || 'medium';
+  document.getElementById('edit-todo-project').value = data.project_id || '';
   initTimeSelects('edit-todo-start', 'edit-todo-end');
   document.getElementById('edit-todo-start').value = data.start_time || '';
   document.getElementById('edit-todo-end').value = data.end_time || '';
@@ -262,6 +291,7 @@ async function saveTodoEdit() {
     priority: document.getElementById('edit-todo-priority').value,
     start_time: document.getElementById('edit-todo-start').value || null,
     end_time: document.getElementById('edit-todo-end').value || null,
+    project_id: document.getElementById('edit-todo-project').value || null,
   }).eq('id', id);
   closeEditModal();
   await loadTodos();

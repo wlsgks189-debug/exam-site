@@ -225,6 +225,7 @@ const NAV_HTML = `
   <a href="index.html" class="page-tab">📁 자료실</a>
   <a href="upload.html" class="page-tab admin-only">📤 업로드</a>
   <a href="todo.html" class="page-tab">✅ 할일</a>
+  <a href="project.html" class="page-tab">🚀 장기프로젝트</a>
   <a href="complaint.html" class="page-tab">📋 1:1 문의</a>
   <a href="complaint_history.html" class="page-tab">📨 민원 이력</a>
   <a href="worklog.html" class="page-tab">📝 업무 일지</a>

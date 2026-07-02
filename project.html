@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>장기프로젝트 — 짱구's Desk</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d1117">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js"></script>
+<style>
+.status-badge{font-size:.7rem;padding:2px 9px;border-radius:20px;font-weight:600;white-space:nowrap;}
+.status-planning{background:#7d859018;color:var(--text-muted);border:1px solid var(--text-muted);}
+.status-active{background:#378ADD18;color:var(--accent);border:1px solid var(--accent);}
+.status-onhold{background:#f0a04018;color:var(--warning);border:1px solid var(--warning);}
+.status-done{background:#4caf8a18;color:var(--success);border:1px solid var(--success);}
+.status-cancelled{background:#f05e5e18;color:var(--danger);border:1px solid var(--danger);}
+
+.proj-cat{font-size:.68rem;padding:2px 8px;border-radius:12px;background:#378ADD18;color:var(--accent);border:1px solid var(--accent);}
+.dday-chip{font-size:.7rem;padding:2px 8px;border-radius:12px;font-weight:600;background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);}
+.dday-chip.soon{background:#f05e5e18;color:var(--danger);border-color:var(--danger);}
+.dday-chip.today{background:#f0a04018;color:var(--warning);border-color:var(--warning);}
+
+.proj-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.1rem 1.2rem;margin-bottom:.8rem;box-shadow:0 2px 8px var(--shadow);}
+.proj-head{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem;}
+.proj-title{font-size:1rem;font-weight:700;flex:1;min-width:120px;}
+.proj-desc{font-size:.82rem;color:var(--text-muted);line-height:1.6;margin-bottom:.7rem;white-space:pre-wrap;}
+.proj-progress-row{display:flex;align-items:center;gap:.6rem;margin-bottom:.8rem;}
+.proj-progress-row .progress-bar{flex:1;margin-top:0;}
+.proj-progress-label{font-size:.72rem;color:var(--text-muted);white-space:nowrap;flex-shrink:0;}
+.proj-actions{display:flex;gap:.4rem;flex-wrap:wrap;}
+
+.cat-section{background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:.8rem;overflow:hidden;}
+.cat-toggle{display:flex;align-items:center;justify-content:space-between;padding:.9rem 1.1rem;cursor:pointer;font-size:.95rem;font-weight:600;transition:background .2s;}
+.cat-toggle:hover{background:var(--surface2);}
+.cat-count{font-size:.75rem;color:var(--text-muted);font-weight:400;}
+.cat-arrow{font-size:.75rem;color:var(--text-muted);transition:transform .2s;}
+.cat-body{padding:.9rem;border-top:1px solid var(--border);}
+
+.milestone-add-row{display:flex;gap:.5rem;margin-bottom:.8rem;}
+.milestone-add-row input{flex:1;}
+
+.note-item{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.7rem .85rem;margin-bottom:.5rem;}
+.note-text{font-size:.84rem;line-height:1.6;white-space:pre-wrap;}
+.note-time{font-size:.68rem;color:var(--text-muted);margin-top:.35rem;}
+.note-add-row{display:flex;gap:.5rem;margin-bottom:1rem;}
+.note-add-row textarea{flex:1;min-height:44px;resize:none;}
+
+.proj-modal-box{max-width:600px;max-height:85vh;overflow-y:auto;}
+.proj-modal-meta{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.6rem;}
+.section-label{font-size:.85rem;font-weight:600;margin:1.1rem 0 .6rem;display:flex;align-items:center;justify-content:space-between;}
+</style>
+</head>
+<body>
+
+<!-- 프로젝트 상세 모달 -->
+<div id="proj-modal" class="modal-overlay" style="display:none">
+  <div class="modal-box proj-modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.4rem">
+      <h2 style="margin:0;font-size:1.15rem" id="pm-title">프로젝트</h2>
+      <button class="btn btn-outline btn-sm" onclick="closeProjModal()" style="padding:.3rem .6rem">✕</button>
+    </div>
+    <div class="proj-modal-meta">
+      <span class="proj-cat" id="pm-cat"></span>
+      <span class="status-badge" id="pm-status"></span>
+      <span class="dday-chip" id="pm-dday"></span>
+    </div>
+    <div class="proj-desc" id="pm-desc" style="margin-bottom:1rem"></div>
+
+    <div class="proj-progress-row">
+      <span class="proj-progress-label" id="pm-progress-label">0/0</span>
+      <div class="progress-bar"><div class="progress-fill" id="pm-progress-fill" style="width:0%"></div></div>
+    </div>
+
+    <div class="section-label">✅ 마일스톤</div>
+    <div class="milestone-add-row">
+      <input type="text" id="ms-input" placeholder="마일스톤 입력 (Enter로 추가)" onkeydown="if(event.key==='Enter'){addMilestone();}">
+      <button class="btn btn-primary" style="width:auto;margin:0" onclick="addMilestone()">+ 추가</button>
+    </div>
+    <div id="ms-list"><div class="empty">마일스톤이 없습니다</div></div>
+
+    <div class="section-label">📝 진행 로그</div>
+    <div class="note-add-row">
+      <textarea id="note-input" placeholder="진행 상황을 기록하세요"></textarea>
+      <button class="btn btn-primary" style="width:auto;margin:0" onclick="addNote()">기록</button>
+    </div>
+    <div id="note-list"><div class="empty">기록이 없습니다</div></div>
+  </div>
+</div>
+
+<div id="main-section" style="display:none">
+  <div class="container">
+    <div class="section-title">🚀 장기프로젝트</div>
+    <div class="section-sub">몇 주~몇 달짜리 과제를 마일스톤과 함께 추적하세요</div>
+
+    <!-- 추가/수정 폼 -->
+    <div class="card" id="proj-form-card">
+      <h2 id="proj-form-title">프로젝트 추가</h2>
+      <input type="hidden" id="proj-edit-id">
+      <div class="form-row" style="flex-wrap:wrap">
+        <div class="form-group" style="flex:2;min-width:200px"><label>제목</label><input type="text" id="proj-title" placeholder="예: 자료실 검색 기능 개편"></div>
+        <div class="form-group" style="flex:1;min-width:120px"><label>카테고리</label><input type="text" id="proj-category" placeholder="예: 시스템개선"></div>
+      </div>
+      <div class="form-row" style="flex-wrap:wrap">
+        <div class="form-group" style="min-width:calc(33% - .4rem)"><label>상태</label>
+          <select id="proj-status">
+            <option value="planning">계획중</option>
+            <option value="active" selected>진행중</option>
+            <option value="onhold">보류</option>
+            <option value="done">완료</option>
+            <option value="cancelled">중단</option>
+          </select>
+        </div>
+        <div class="form-group" style="min-width:calc(33% - .4rem)"><label>시작일</label><input type="date" id="proj-start"></div>
+        <div class="form-group" style="min-width:calc(33% - .4rem)"><label>목표 마감일</label><input type="date" id="proj-target"></div>
+      </div>
+      <div class="form-group"><label>설명</label><textarea id="proj-desc-input" style="min-height:80px" placeholder="프로젝트 개요를 입력하세요"></textarea></div>
+      <button class="btn btn-primary" onclick="saveProject()">저장</button>
+    </div>
+
+    <!-- 필터 -->
+    <div class="filter-bar">
+      <select id="filter-status" onchange="renderProjects()">
+        <option value="">전체 상태</option>
+        <option value="planning">계획중</option>
+        <option value="active">진행중</option>
+        <option value="onhold">보류</option>
+      </select>
+      <select id="filter-category" onchange="renderProjects()"><option value="">전체 카테고리</option></select>
+    </div>
+
+    <!-- 진행중인 프로젝트 -->
+    <div id="active-proj-list"></div>
+
+    <!-- 완료/중단 아카이브 -->
+    <div class="cat-section">
+      <div class="cat-toggle" onclick="toggleArchive()">
+        <span>📦 완료 · 중단된 프로젝트 <span class="cat-count" id="archive-count">0개</span></span>
+        <span class="cat-arrow" id="archive-arrow">▶</span>
+      </div>
+      <div class="cat-body" id="archive-body" style="display:none"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let allProjects = [];
+let milestoneCounts = {}; // project_id -> {done, total}
+let currentProjId = null;
+
+window.addEventListener('DOMContentLoaded', () => {
+  initPage(() => { loadProjects(); });
+});
+
+document.addEventListener('click', e => { if (e.target.id === 'proj-modal') closeProjModal(); });
+
+async function loadProjects() {
+  const { data } = await sb.from('long_projects').select('*').eq('user_id', currentUser.id).order('target_date', { ascending: true, nullsFirst: false });
+  allProjects = data || [];
+
+  // 카테고리 필터 옵션 갱신
+  const cats = [...new Set(allProjects.map(p => p.category).filter(Boolean))];
+  const sel = document.getElementById('filter-category');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">전체 카테고리</option>' + cats.map(c => `<option value="${c}" ${c===cur?'selected':''}>${c}</option>`).join('');
+
+  // 마일스톤 진행률 일괄 조회
+  const ids = allProjects.map(p => p.id);
+  milestoneCounts = {};
+  if (ids.length) {
+    const { data: ms } = await sb.from('project_milestones').select('project_id, done').in('project_id', ids);
+    (ms || []).forEach(m => {
+      if (!milestoneCounts[m.project_id]) milestoneCounts[m.project_id] = { done: 0, total: 0 };
+      milestoneCounts[m.project_id].total++;
+      if (m.done) milestoneCounts[m.project_id].done++;
+    });
+  }
+  renderProjects();
+}
+
+function ddayInfo(target) {
+  if (!target) return { text: '', cls: '' };
+  const today = new Date(); today.setHours(0,0,0,0);
+  const t = new Date(target); t.setHours(0,0,0,0);
+  const diff = Math.round((t - today) / 86400000);
+  if (diff === 0) return { text: 'D-Day', cls: 'today' };
+  if (diff < 0) return { text: `D+${-diff}`, cls: 'today' };
+  if (diff <= 7) return { text: `D-${diff}`, cls: 'soon' };
+  return { text: `D-${diff}`, cls: '' };
+}
+
+const STATUS_LABEL = { planning: '계획중', active: '진행중', onhold: '보류', done: '완료', cancelled: '중단' };
+
+function projCardHTML(p) {
+  const mc = milestoneCounts[p.id] || { done: 0, total: 0 };
+  const pct = mc.total ? Math.round(mc.done / mc.total * 100) : 0;
+  const dd = ddayInfo(p.target_date);
+  return `<div class="proj-card">
+    <div class="proj-head">
+      <div class="proj-title">${p.title}</div>
+      <span class="proj-cat">${p.category || '기타'}</span>
+      <span class="status-badge status-${p.status}">${STATUS_LABEL[p.status] || p.status}</span>
+      ${dd.text ? `<span class="dday-chip ${dd.cls}">${dd.text}</span>` : ''}
+    </div>
+    ${p.description ? `<div class="proj-desc">${p.description}</div>` : ''}
+    <div class="proj-progress-row">
+      <span class="proj-progress-label">${mc.done}/${mc.total}</span>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+    </div>
+    <div class="proj-actions">
+      <button class="btn btn-outline btn-sm" onclick="openProjModal('${p.id}')">📂 열기</button>
+      <button class="btn btn-outline btn-sm" onclick="editProject('${p.id}')">✏️ 수정</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteProject('${p.id}')">🗑</button>
+    </div>
+  </div>`;
+}
+
+function renderProjects() {
+  const statusFilter = document.getElementById('filter-status').value;
+  const catFilter = document.getElementById('filter-category').value;
+
+  let filtered = allProjects;
+  if (catFilter) filtered = filtered.filter(p => p.category === catFilter);
+
+  const archived = filtered.filter(p => p.status === 'done' || p.status === 'cancelled');
+  let active = filtered.filter(p => p.status !== 'done' && p.status !== 'cancelled');
+  if (statusFilter) active = active.filter(p => p.status === statusFilter);
+
+  const order = { active: 0, planning: 1, onhold: 2 };
+  active.sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
+
+  const listEl = document.getElementById('active-proj-list');
+  listEl.innerHTML = active.length ? active.map(projCardHTML).join('') : '<div class="empty">해당하는 프로젝트가 없습니다</div>';
+
+  document.getElementById('archive-count').textContent = `${archived.length}개`;
+  document.getElementById('archive-body').innerHTML = archived.length
+    ? archived.map(projCardHTML).join('')
+    : '<div class="empty">완료·중단된 프로젝트가 없습니다</div>';
+}
+
+function toggleArchive() {
+  const body = document.getElementById('archive-body');
+  const arrow = document.getElementById('archive-arrow');
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  arrow.textContent = isOpen ? '▶' : '▼';
+}
+
+async function saveProject() {
+  const title = document.getElementById('proj-title').value.trim();
+  const category = document.getElementById('proj-category').value.trim() || '기타';
+  const status = document.getElementById('proj-status').value;
+  const start_date = document.getElementById('proj-start').value || null;
+  const target_date = document.getElementById('proj-target').value || null;
+  const description = document.getElementById('proj-desc-input').value.trim();
+  const editId = document.getElementById('proj-edit-id').value;
+  if (!title) { showToast('⚠️ 제목을 입력해주세요'); return; }
+
+  if (editId) {
+    await sb.from('long_projects').update({ title, category, status, start_date, target_date, description }).eq('id', editId);
+    document.getElementById('proj-edit-id').value = '';
+    document.getElementById('proj-form-title').textContent = '프로젝트 추가';
+  } else {
+    await sb.from('long_projects').insert({ user_id: currentUser.id, title, category, status, start_date, target_date, description });
+  }
+  ['proj-title','proj-category','proj-desc-input'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('proj-start').value = '';
+  document.getElementById('proj-target').value = '';
+  document.getElementById('proj-status').value = 'active';
+  showToast('✅ 저장됐어요!');
+  loadProjects();
+}
+
+async function editProject(id) {
+  const p = allProjects.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('proj-edit-id').value = p.id;
+  document.getElementById('proj-title').value = p.title;
+  document.getElementById('proj-category').value = p.category || '';
+  document.getElementById('proj-status').value = p.status;
+  document.getElementById('proj-start').value = p.start_date || '';
+  document.getElementById('proj-target').value = p.target_date || '';
+  document.getElementById('proj-desc-input').value = p.description || '';
+  document.getElementById('proj-form-title').textContent = '프로젝트 수정';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function deleteProject(id) {
+  if (!confirm('프로젝트를 삭제할까요? 마일스톤과 로그도 함께 삭제됩니다.')) return;
+  await sb.from('long_projects').delete().eq('id', id);
+  showToast('🗑 삭제됐어요');
+  loadProjects();
+}
+
+// ===== 상세 모달 =====
+async function openProjModal(id) {
+  const p = allProjects.find(x => x.id === id);
+  if (!p) return;
+  currentProjId = id;
+  document.getElementById('pm-title').textContent = p.title;
+  document.getElementById('pm-cat').textContent = p.category || '기타';
+  document.getElementById('pm-status').textContent = STATUS_LABEL[p.status] || p.status;
+  document.getElementById('pm-status').className = 'status-badge status-' + p.status;
+  const dd = ddayInfo(p.target_date);
+  const ddEl = document.getElementById('pm-dday');
+  ddEl.textContent = dd.text;
+  ddEl.className = 'dday-chip ' + dd.cls;
+  ddEl.style.display = dd.text ? 'inline-block' : 'none';
+  document.getElementById('pm-desc').textContent = p.description || '(설명 없음)';
+  document.getElementById('ms-input').value = '';
+  document.getElementById('note-input').value = '';
+  document.getElementById('proj-modal').style.display = 'flex';
+  await Promise.all([loadMilestones(id), loadNotes(id)]);
+}
+
+function closeProjModal() {
+  document.getElementById('proj-modal').style.display = 'none';
+  currentProjId = null;
+  loadProjects();
+}
+
+async function loadMilestones(projectId) {
+  const { data } = await sb.from('project_milestones').select('*').eq('project_id', projectId).order('sort_order').order('created_at');
+  const el = document.getElementById('ms-list');
+  if (!data || !data.length) { el.innerHTML = '<div class="empty">마일스톤이 없습니다</div>'; updateProgressUI(0, 0); return; }
+  el.innerHTML = data.map(m => `
+    <div class="todo-item ${m.done ? 'done' : ''}">
+      <input type="checkbox" class="todo-check" ${m.done ? 'checked' : ''} onchange="toggleMilestone('${m.id}',this.checked)">
+      <div class="todo-text">${m.content}</div>
+      <button class="btn btn-danger btn-sm" onclick="deleteMilestone('${m.id}')" style="padding:.2rem .4rem">🗑</button>
+    </div>`).join('');
+  const done = data.filter(m => m.done).length;
+  updateProgressUI(done, data.length);
+}
+
+function updateProgressUI(done, total) {
+  document.getElementById('pm-progress-label').textContent = `${done}/${total}`;
+  document.getElementById('pm-progress-fill').style.width = (total ? Math.round(done/total*100) : 0) + '%';
+}
+
+async function addMilestone() {
+  const input = document.getElementById('ms-input');
+  const content = input.value.trim();
+  if (!content || !currentProjId) return;
+  await sb.from('project_milestones').insert({ project_id: currentProjId, content });
+  input.value = '';
+  loadMilestones(currentProjId);
+}
+
+async function toggleMilestone(id, done) {
+  await sb.from('project_milestones').update({ done, done_at: done ? new Date().toISOString() : null }).eq('id', id);
+  loadMilestones(currentProjId);
+}
+
+async function deleteMilestone(id) {
+  await sb.from('project_milestones').delete().eq('id', id);
+  loadMilestones(currentProjId);
+}
+
+async function loadNotes(projectId) {
+  const { data } = await sb.from('project_notes').select('*').eq('project_id', projectId).order('created_at', { ascending: false });
+  const el = document.getElementById('note-list');
+  if (!data || !data.length) { el.innerHTML = '<div class="empty">기록이 없습니다</div>'; return; }
+  el.innerHTML = data.map(n => `
+    <div class="note-item">
+      <div class="note-text">${n.content}</div>
+      <div class="note-time">${fmtDateTime(n.created_at)}</div>
+    </div>`).join('');
+}
+
+async function addNote() {
+  const input = document.getElementById('note-input');
+  const content = input.value.trim();
+  if (!content || !currentProjId) return;
+  await sb.from('project_notes').insert({ project_id: currentProjId, content });
+  input.value = '';
+  loadNotes(currentProjId);
+}
+
+function fmtDateTime(iso) {
+  const d = new Date(iso);
+  return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+</script>
+</body>
+</html>
