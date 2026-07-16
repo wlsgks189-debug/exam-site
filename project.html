@@ -61,7 +61,10 @@
   <div class="modal-box proj-modal-box">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.4rem">
       <h2 style="margin:0;font-size:1.15rem" id="pm-title">프로젝트</h2>
-      <button class="btn btn-outline btn-sm" onclick="closeProjModal()" style="padding:.3rem .6rem">✕</button>
+      <div style="display:flex;gap:.4rem;flex-shrink:0">
+        <button class="btn btn-outline btn-sm" id="pm-complete-btn" onclick="completeFromModal()" style="padding:.3rem .6rem">✅ 완료</button>
+        <button class="btn btn-outline btn-sm" onclick="closeProjModal()" style="padding:.3rem .6rem">✕</button>
+      </div>
     </div>
     <div class="proj-modal-meta">
       <span class="proj-cat" id="pm-cat"></span>
@@ -212,6 +215,7 @@ function projCardHTML(p) {
     </div>
     <div class="proj-actions">
       <button class="btn btn-outline btn-sm" onclick="openProjModal('${p.id}')">📂 열기</button>
+      ${p.status !== 'done' ? `<button class="btn btn-outline btn-sm" onclick="completeProject('${p.id}')">✅ 완료</button>` : ''}
       <button class="btn btn-outline btn-sm" onclick="editProject('${p.id}')">✏️ 수정</button>
       <button class="btn btn-danger btn-sm" onclick="deleteProject('${p.id}')">🗑</button>
     </div>
@@ -295,6 +299,13 @@ async function deleteProject(id) {
   loadProjects();
 }
 
+async function completeProject(id) {
+  if (!confirm('프로젝트를 완료 처리할까요? 완료 목록으로 이동합니다.')) return;
+  await sb.from('long_projects').update({ status: 'done' }).eq('id', id);
+  showToast('🎉 완료 처리됐어요!');
+  loadProjects();
+}
+
 // ===== 상세 모달 =====
 async function openProjModal(id) {
   const p = allProjects.find(x => x.id === id);
@@ -310,6 +321,7 @@ async function openProjModal(id) {
   ddEl.className = 'dday-chip ' + dd.cls;
   ddEl.style.display = dd.text ? 'inline-block' : 'none';
   document.getElementById('pm-desc').textContent = p.description || '(설명 없음)';
+  document.getElementById('pm-complete-btn').style.display = p.status === 'done' ? 'none' : 'inline-block';
   document.getElementById('ms-input').value = '';
   document.getElementById('note-input').value = '';
   document.getElementById('proj-modal').style.display = 'flex';
@@ -320,6 +332,14 @@ function closeProjModal() {
   document.getElementById('proj-modal').style.display = 'none';
   currentProjId = null;
   loadProjects();
+}
+
+async function completeFromModal() {
+  if (!currentProjId) return;
+  if (!confirm('프로젝트를 완료 처리할까요? 완료 목록으로 이동합니다.')) return;
+  await sb.from('long_projects').update({ status: 'done' }).eq('id', currentProjId);
+  showToast('🎉 완료 처리됐어요!');
+  closeProjModal();
 }
 
 async function loadMilestones(projectId) {
@@ -366,7 +386,10 @@ async function loadNotes(projectId) {
   if (!data || !data.length) { el.innerHTML = '<div class="empty">기록이 없습니다</div>'; return; }
   el.innerHTML = data.map(n => `
     <div class="note-item">
-      <div class="note-text">${n.content}</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem">
+        <div class="note-text">${n.content}</div>
+        <button class="btn btn-danger btn-sm" onclick="deleteNote('${n.id}')" style="padding:.15rem .4rem;flex-shrink:0">🗑</button>
+      </div>
       <div class="note-time">${fmtDateTime(n.created_at)}</div>
     </div>`).join('');
 }
@@ -377,6 +400,12 @@ async function addNote() {
   if (!content || !currentProjId) return;
   await sb.from('project_notes').insert({ project_id: currentProjId, content });
   input.value = '';
+  loadNotes(currentProjId);
+}
+
+async function deleteNote(id) {
+  if (!confirm('이 기록을 삭제할까요?')) return;
+  await sb.from('project_notes').delete().eq('id', id);
   loadNotes(currentProjId);
 }
 
