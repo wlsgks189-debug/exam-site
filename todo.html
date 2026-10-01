@@ -80,9 +80,9 @@
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem">
         <h2 style="margin:0" id="todo-date-label">오늘 할일</h2>
-        <div style="display:flex;align-items:center;gap:.6rem">
-          <select id="todo-project-filter" onchange="loadTodos()" style="width:auto;padding:.3rem .6rem;font-size:.8rem"><option value="">전체 프로젝트</option></select>
-          <span id="todo-stats" style="font-size:.75rem;color:var(--text-muted)"></span>
+        <div style="display:flex;align-items:center;gap:.6rem;min-width:0;max-width:100%;flex-wrap:wrap">
+          <select id="todo-project-filter" onchange="loadTodos()" style="width:auto;max-width:100%;min-width:0;padding:.3rem .6rem;font-size:.8rem"><option value="">전체 프로젝트</option></select>
+          <span id="todo-stats" style="font-size:.75rem;color:var(--text-muted);white-space:nowrap"></span>
         </div>
       </div>
       <div id="todo-list"><div class="empty">할일이 없습니다</div></div>
