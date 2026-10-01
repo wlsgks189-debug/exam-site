@@ -440,8 +440,12 @@ async function loadGcal() {
   el.innerHTML = '<div class="empty">불러오는 중...</div>';
   const dateVal = document.getElementById('todo-date')?.value;
   if (!dateVal) return;
+  // 선택한 날짜의 0시 ~ 다음날 0시 (브라우저 시간대 기준 — UTC 로 자르면 한국에서 하루가 어긋남)
+  const [gy, gm, gd] = dateVal.split('-').map(Number);
+  const tMin = new Date(gy, gm - 1, gd, 0, 0, 0).toISOString();
+  const tMax = new Date(gy, gm - 1, gd + 1, 0, 0, 0).toISOString();
   try {
-    const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events?key=${apiKey}&timeMin=${dateVal}T00:00:00Z&timeMax=${dateVal}T23:59:59Z&singleEvents=true&orderBy=startTime`);
+    const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events?key=${apiKey}&timeMin=${encodeURIComponent(tMin)}&timeMax=${encodeURIComponent(tMax)}&singleEvents=true&orderBy=startTime`);
     if (!res.ok) { el.innerHTML = `<div class="empty" style="color:var(--danger)">⚠️ 불러오기 실패.<br><button class="btn btn-outline btn-sm" style="margin-top:.5rem" onclick="showGcalSetup()">설정 변경</button></div>`; return; }
     const data = await res.json();
     if (!data.items || !data.items.length) { el.innerHTML = '<div class="empty">오늘 일정이 없습니다</div>'; return; }
