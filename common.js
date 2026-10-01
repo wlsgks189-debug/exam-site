@@ -94,6 +94,7 @@ async function handleUser(user, onReady) {
 
   // 네비 업데이트 (사이드바 / 더보기 시트의 사용자 영역)
   document.body.classList.remove('auth-mode');
+  document.body.classList.toggle('is-pending', currentRole === 'pending');
   document.querySelectorAll('.js-user-email').forEach(el => { el.textContent = user.email; });
   document.querySelectorAll('.js-avatar').forEach(el => { el.textContent = (user.email || '?').charAt(0).toUpperCase(); });
   document.querySelectorAll('.js-user-badge').forEach(el => {
@@ -123,7 +124,7 @@ async function handleUser(user, onReady) {
 
 function showAuthSection() {
   document.body.classList.add('auth-mode');
-  closeMore();
+  closeMore(); closeSearch(); closeQuickAdd();
   const auth = document.getElementById('auth-section');
   const main = document.getElementById('main-section');
   if (auth) auth.style.display = 'block';
@@ -220,7 +221,13 @@ const ICON = {
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
   close: '<path d="M18 6 6 18M6 6l12 12"/>',
-  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>'
+  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  star4: '<path d="M12 3c.6 4.8 4.2 8.4 9 9-4.8.6-8.4 4.2-9 9-.6-4.8-4.2-8.4-9-9 4.8-.6 8.4-4.2 9-9z"/>',
+  asterisk: '<path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9"/>',
+  ext: '<path d="M7 17 17 7"/><path d="M8 7h9v9"/>',
+  building: '<path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/><path d="M9 11h.01M15 11h.01"/>'
 };
 function svgIcon(name, size) {
   size = size || 18;
@@ -246,6 +253,15 @@ const MENU = [
   { href: 'notice.html',            icon: 'notice',   label: '공지사항',      group: '기록' }
 ];
 const NAV_GROUPS = ['업무', '자료', '기록'];
+
+// ===== 외부 바로가기 (여기만 고치면 대시보드와 검색창(Ctrl K)에 같이 반영) =====
+const TOOL_LINKS = [
+  { id: 'gemini',  name: 'Gemini',  url: 'https://gemini.google.com/app', icon: 'star4',    alias: ['제미나이', '제미니', 'google', '구글'] },
+  { id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/',          icon: 'chat',     alias: ['gpt', '챗지피티', '지피티', '챗gpt', 'openai'] },
+  { id: 'claude',  name: 'Claude',  url: 'https://claude.ai/',            icon: 'asterisk', alias: ['클로드', 'anthropic'] },
+  { id: 'notion',  name: 'Notion',  url: 'https://www.notion.so/',        icon: 'log',      alias: ['노션'] },
+  { id: 'icqa',    name: 'ICQA',    url: 'https://www.icqa.or.kr/',       icon: 'building', alias: ['한국정보통신자격협회', '정보통신자격협회', '자격협회', '협회', '홈페이지'], full: 'ICQA 한국정보통신자격협회' }
+];
 const TAB_ORDER = ['dashboard.html', 'todo.html', 'index.html', 'project.html'];  // 모바일 하단 탭 (+ 더보기)
 
 function logoSvg(size) {
@@ -279,25 +295,373 @@ function markActiveNav() {
   if (more) more.classList.toggle('active', !tabHit);
 }
 
-// ===== 모바일 '더보기' 시트 =====
-let _moreReturnFocus = null;
-function openMore() {
-  const sh = document.getElementById('more-sheet');
-  if (!sh) return;
-  _moreReturnFocus = document.activeElement;
-  sh.classList.add('open');
+// ===== 오버레이 공통 (열린 창 관리 / 스크롤 잠금 / 포커스 가두기) =====
+const _openOverlays = [];
+function $id(id) { return document.getElementById(id); }
+function overlayOpen(el, focusEl, closeFn) {
+  if (!el || _openOverlays.some(o => o.el === el)) return;
+  _openOverlays.push({ el, ret: document.activeElement, closeFn });
+  el.classList.add('open');
   document.body.style.overflow = 'hidden';
-  const btn = sh.querySelector('.sheet-close');
-  if (btn) btn.focus();
+  if (focusEl && focusEl.focus) focusEl.focus({ preventScroll: true });   // 사용자 동작 안에서 바로 포커스 (iOS 키보드 때문)
 }
-function closeMore() {
-  const sh = document.getElementById('more-sheet');
-  if (!sh || !sh.classList.contains('open')) return;
-  sh.classList.remove('open');
-  document.body.style.overflow = '';
-  if (_moreReturnFocus && _moreReturnFocus.focus) _moreReturnFocus.focus();
+function overlayClose(el) {
+  const i = _openOverlays.findIndex(o => o.el === el);
+  if (i < 0) return;
+  const o = _openOverlays.splice(i, 1)[0];
+  el.classList.remove('open');
+  if (!_openOverlays.length) document.body.style.overflow = '';
+  if (o.ret && o.ret.focus && document.body.contains(o.ret)) o.ret.focus({ preventScroll: true });
 }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMore(); });
+
+// ===== 모바일 '더보기' 시트 =====
+function openMore() { const sh = $id('more-sheet'); if (sh) overlayOpen(sh, sh.querySelector('.sheet-close'), closeMore); }
+function closeMore() { const sh = $id('more-sheet'); if (sh) overlayClose(sh); }
+
+// ===== 빠른 추가 (할일) =====
+const _qa = { busy: false, loadingProjects: false };
+function qaTimes() {
+  const out = [];
+  for (let h = 9; h <= 18; h++) for (const m of ['00', '30']) { if (h === 18 && m === '30') break; out.push(`${String(h).padStart(2, '0')}:${m}`); }
+  return out;
+}
+function ymdLocal(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function qaDateFor(when) {
+  const d = new Date(); d.setHours(0, 0, 0, 0);
+  if (when === 'tomorrow') d.setDate(d.getDate() + 1);
+  else if (when === 'nextweek') d.setDate(d.getDate() + (((8 - d.getDay()) % 7) || 7));   // 다음 주 월요일
+  return ymdLocal(d);
+}
+function qaWhenValue() { const r = document.querySelector('input[name="qa-when"]:checked'); return r ? r.value : 'today'; }
+function qaGetDate() { const w = qaWhenValue(); return w === 'custom' ? ($id('qa-date').value || '') : qaDateFor(w); }
+function qaWhen() {
+  const custom = qaWhenValue() === 'custom';
+  $id('qa-date').style.display = custom ? '' : 'none';
+  const v = qaGetDate();
+  const hint = $id('qa-date-hint');
+  if (!v) { hint.textContent = ''; return; }
+  const [y, m, d] = v.split('-').map(Number);
+  hint.textContent = `${m}월 ${d}일 (${['일', '월', '화', '수', '목', '금', '토'][new Date(y, m - 1, d).getDay()]})`;
+}
+function qaError(msg, focusId) {
+  const el = $id('qa-err');
+  el.textContent = msg; el.classList.add('show');
+  if (focusId && $id(focusId)) $id(focusId).focus();
+}
+function qaReset(prefill) {
+  const opts = '<option value="">선택</option>' + qaTimes().map(t => `<option value="${t}">${t}</option>`).join('');
+  $id('qa-start').innerHTML = opts; $id('qa-end').innerHTML = opts;
+  $id('qa-text').value = prefill || '';
+  document.querySelector('input[name="qa-pri"][value="medium"]').checked = true;
+  // 할일 페이지에서 다른 날짜를 보는 중이면 그 날짜를 기본으로
+  const pageDate = ($id('todo-date') || {}).value;
+  if (pageDate && /^\d{4}-\d{2}-\d{2}$/.test(pageDate) && pageDate !== qaDateFor('today')) {
+    document.querySelector('input[name="qa-when"][value="custom"]').checked = true;
+    $id('qa-date').value = pageDate;
+  } else {
+    document.querySelector('input[name="qa-when"][value="today"]').checked = true;
+    $id('qa-date').value = '';
+  }
+  $id('qa-project').value = '';
+  $id('qa-err').classList.remove('show'); $id('qa-err').textContent = '';
+  $id('qa-submit').disabled = false; $id('qa-submit').textContent = '추가';
+  _qa.busy = false;
+  qaWhen();
+}
+async function qaLoadProjects() {
+  if (_qa.loadingProjects || !currentUser) return;
+  _qa.loadingProjects = true;
+  try {
+    const { data } = await sb.from('long_projects').select('id, title, status')
+      .eq('user_id', currentUser.id).in('status', ['planning', 'active']).order('title');
+    const sel = $id('qa-project'); if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">없음</option>' + (data || []).map(p => `<option value="${escHtml(p.id)}">${escHtml(p.title)}</option>`).join('');
+    sel.value = cur;
+  } catch (e) { /* 프로젝트 목록을 못 불러와도 할일 추가는 가능 */ }
+  finally { _qa.loadingProjects = false; }
+}
+function openQuickAdd(prefill) {
+  if (!shellReady()) return;
+  const el = $id('qa-overlay'); if (!el) return;
+  closeSearch(); closeMore();
+  qaReset(typeof prefill === 'string' ? prefill : '');
+  overlayOpen(el, $id('qa-text'), closeQuickAdd);
+  qaLoadProjects();
+}
+function closeQuickAdd() { const el = $id('qa-overlay'); if (el) overlayClose(el); }
+function qaKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); qaSubmit(); }
+}
+async function qaSubmit() {
+  if (_qa.busy) return;
+  const text = $id('qa-text').value.trim();
+  const date = qaGetDate();
+  const start = $id('qa-start').value, end = $id('qa-end').value;
+  $id('qa-err').classList.remove('show');
+  if (!text) return qaError('할일 내용을 입력해 주세요', 'qa-text');
+  if (!date) return qaError('날짜를 선택해 주세요', 'qa-date');
+  if (start && end && end <= start) return qaError('종료 시간은 시작 시간보다 늦어야 해요', 'qa-end');
+  _qa.busy = true;
+  const btn = $id('qa-submit'); btn.disabled = true; btn.textContent = '저장 중...';
+  let failed = false;
+  try {
+    const { error } = await sb.from('todos').insert({
+      user_id: currentUser.id, text, date,
+      priority: (document.querySelector('input[name="qa-pri"]:checked') || {}).value || 'medium',
+      start_time: start || null, end_time: end || null,
+      project_id: $id('qa-project').value || null,
+      done: false
+    });
+    failed = !!error;
+  } catch (e) { failed = true; }
+  _qa.busy = false; btn.disabled = false; btn.textContent = '추가';
+  if (failed) return qaError('저장하지 못했어요. 잠시 후 다시 시도해 주세요');
+  closeQuickAdd();
+  showToast('✅ 할일 추가됐어요!');
+  window.dispatchEvent(new CustomEvent('todo-added', { detail: { date } }));
+}
+
+// ===== 통합 검색 (Ctrl K) =====
+const SEARCH_KINDS = ['todo', 'complaint', 'worklog', 'notice', 'bookmark', 'file'];
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+function safeHttp(u) { try { const x = new URL(u); return x.protocol === 'http:' || x.protocol === 'https:'; } catch (e) { return false; } }
+const KIND_INFO = {
+  todo:      { label: '할일',      icon: 'todo',     url: r => 'todo.html' + (DATE_RE.test(r.ref_date || '') ? '?date=' + r.ref_date : '') },
+  complaint: { label: '민원 이력', icon: 'inbox',    url: () => 'complaint_history.html' },
+  worklog:   { label: '업무 일지', icon: 'log',      url: () => 'worklog.html' },
+  notice:    { label: '공지사항',  icon: 'notice',   url: () => 'notice.html' },
+  bookmark:  { label: '북마크',    icon: 'bookmark', url: r => (safeHttp(r.snippet) ? r.snippet : 'bookmark.html') },
+  file:      { label: '자료실',    icon: 'folder',   url: () => 'index.html' }
+};
+const _s = { items: [], active: 0, seq: 0, timer: null, loading: false, error: false, remote: [] };
+
+function hlText(text, q) {
+  text = String(text == null ? '' : text);
+  if (!q) return escHtml(text);
+  const lower = text.toLowerCase(), ql = q.toLowerCase();
+  let out = '', i = 0, idx;
+  while ((idx = lower.indexOf(ql, i)) !== -1) {
+    out += escHtml(text.slice(i, idx)) + '<mark>' + escHtml(text.slice(idx, idx + q.length)) + '</mark>';
+    i = idx + q.length;
+  }
+  return out + escHtml(text.slice(i));
+}
+function searchQuery() { const i = $id('search-input'); return i ? i.value.trim() : ''; }
+function searchBuild() {
+  const q = searchQuery(), ql = q.toLowerCase();
+  const isAdmin = currentRole === 'admin';
+  const cur = currentFile();
+  const nav = MENU
+    .filter(m => (!m.admin || isAdmin) && (!q || m.label.toLowerCase().includes(ql) || (m.short || '').toLowerCase().includes(ql)))
+    .map(m => ({ group: '이동', icon: m.icon, title: m.label, sub: m.href === cur ? '현재 페이지' : '', run: () => { closeSearch(); if (m.href !== cur) location.href = m.href; } }));
+  const acts = [{ group: '작업', icon: 'plus', title: q ? `새 할일 추가: ${q}` : '새 할일 추가', kbd: q ? '' : 'N', run: () => { closeSearch(); openQuickAdd(q); } }];
+  if (!q || /테마|다크|라이트|theme|dark|light/i.test(q)) {
+    acts.push({ group: '작업', icon: document.documentElement.getAttribute('data-theme') === 'dark' ? 'sun' : 'moon', title: '테마 전환', run: () => { toggleTheme(); closeSearch(); } });
+  }
+  const links = !q ? [] : TOOL_LINKS
+    .filter(t => ((t.full || t.name) + ' ' + t.alias.join(' ')).toLowerCase().includes(ql))
+    .map(t => ({ group: '바로가기', icon: t.icon, title: t.full || t.name, sub: t.url.replace(/^https?:\/\//, '').replace(/\/.*$/, ''), ext: true,
+                 run: () => { closeSearch(); window.open(t.url, '_blank', 'noopener'); } }));
+  const remote = SEARCH_KINDS.flatMap(k => _s.remote
+    .filter(r => r && r.kind === k)
+    .sort((a, b) => String(b.ref_date || '').localeCompare(String(a.ref_date || '')))
+    .slice(0, 8)
+    .map(r => {
+      const info = KIND_INFO[k];
+      const parts = k === 'bookmark' || k === 'file' ? [r.snippet] : [r.ref_date !== r.title ? r.ref_date : '', r.snippet];
+      const url = info.url(r);
+      const ext = k === 'bookmark' && safeHttp(r.snippet);
+      return {
+        group: info.label, icon: info.icon, hl: true, ext,
+        title: r.title || '(제목 없음)', sub: parts.filter(Boolean).join(' · '),
+        run: () => { closeSearch(); if (ext) window.open(url, '_blank', 'noopener'); else location.href = url; }
+      };
+    }));
+  return { q, items: q ? [...nav, ...links, ...remote, ...acts] : [...acts, ...nav] };
+}
+function searchRender() {
+  const list = $id('search-list'); if (!list) return;
+  const { q, items } = searchBuild();
+  _s.items = items;
+  if (_s.active >= items.length) _s.active = Math.max(0, items.length - 1);
+  let html = '', prev = '';
+  items.forEach((it, i) => {
+    if (it.group !== prev) { html += `<div class="palette-group" role="presentation">${escHtml(it.group)}</div>`; prev = it.group; }
+    html += `<div class="palette-item${i === _s.active ? ' active' : ''}" role="option" id="so-${i}" data-i="${i}" aria-selected="${i === _s.active}">
+      <span class="pi-ico">${svgIcon(it.icon, 16)}</span>
+      <div class="pi-main"><div class="pi-title">${it.hl ? hlText(it.title, q) : escHtml(it.title)}</div>${it.sub ? `<div class="pi-sub">${it.hl ? hlText(it.sub, q) : escHtml(it.sub)}</div>` : ''}</div>
+      ${it.kbd ? `<kbd>${escHtml(it.kbd)}</kbd>` : ''}${it.ext ? '<span class="pi-ext" title="새 탭에서 열기">↗</span>' : ''}
+    </div>`;
+  });
+  const hasRemote = _s.remote.length > 0;
+  let status = '';
+  if (q && _s.loading) status = '검색 중...';
+  else if (q && _s.error) status = '검색 기능을 불러오지 못했어요. 페이지 이동은 그대로 쓸 수 있어요.';
+  else if (q && !hasRemote && !items.some(it => it.group !== '작업')) status = `'${q}'에 맞는 항목이 없어요`;   // 이동/바로가기 결과가 있으면 안내 안 함
+  if (status) html += `<div class="palette-status">${escHtml(status)}</div>`;
+  list.innerHTML = html;
+  const input = $id('search-input');
+  if (input) { if (items.length) input.setAttribute('aria-activedescendant', 'so-' + _s.active); else input.removeAttribute('aria-activedescendant'); }
+  const live = $id('search-live');
+  if (live) live.textContent = q && !_s.loading ? `결과 ${_s.remote.length}건` : '';
+}
+function searchActiveUpdate(scroll) {
+  const list = $id('search-list'); if (!list) return;
+  list.querySelectorAll('.palette-item').forEach(el => {
+    const on = +el.dataset.i === _s.active;
+    el.classList.toggle('active', on); el.setAttribute('aria-selected', on);
+    if (on && scroll) el.scrollIntoView({ block: 'nearest' });
+  });
+  const input = $id('search-input'); if (input) input.setAttribute('aria-activedescendant', 'so-' + _s.active);
+}
+function searchRemote(q) {
+  const my = ++_s.seq;
+  if (!q) { _s.remote = []; _s.loading = false; _s.error = false; searchRender(); return; }
+  _s.loading = true; searchRender();
+  Promise.resolve(sb.rpc('global_search', { q: q.replace(/[\\%_]/g, '\\$&') })).then(res => {
+    if (my !== _s.seq) return;                // 더 새로운 검색이 이미 시작됨
+    _s.loading = false; _s.error = !!(res && res.error);
+    _s.remote = res && !res.error && Array.isArray(res.data) ? res.data : [];
+    searchRender();
+  }).catch(() => {
+    if (my !== _s.seq) return;
+    _s.loading = false; _s.error = true; _s.remote = []; searchRender();
+  });
+}
+function onSearchInput() {
+  _s.active = 0; _s.remote = []; _s.error = false;
+  const q = searchQuery();
+  clearTimeout(_s.timer);
+  _s.loading = !!q;
+  searchRender();
+  _s.timer = setTimeout(() => searchRemote(q), 220);
+}
+function searchKey(e) {
+  if (e.isComposing || e.keyCode === 229) return;
+  const n = _s.items.length;
+  if (e.key === 'ArrowDown') { e.preventDefault(); if (n) { _s.active = (_s.active + 1) % n; searchActiveUpdate(true); } }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); if (n) { _s.active = (_s.active - 1 + n) % n; searchActiveUpdate(true); } }
+  else if (e.key === 'Enter') { e.preventDefault(); const it = _s.items[_s.active]; if (it) it.run(); }
+}
+function openSearch() {
+  if (!shellReady()) return;
+  const el = $id('search-overlay'); if (!el) return;
+  closeQuickAdd(); closeMore();
+  $id('search-input').value = '';
+  _s.active = 0; _s.remote = []; _s.loading = false; _s.error = false; _s.seq++;
+  searchRender();
+  overlayOpen(el, $id('search-input'), closeSearch);
+}
+function closeSearch() {
+  clearTimeout(_s.timer); _s.seq++;
+  const el = $id('search-overlay'); if (el) overlayClose(el);
+}
+
+// ===== 단축키 =====
+function shellReady() { return !!currentUser && !!currentRole && currentRole !== 'pending' && !document.body.classList.contains('auth-mode'); }
+function isTypingTarget(t) { return !!t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable); }
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && _openOverlays.length) {            // 가장 위에 열린 창부터 닫기
+    e.preventDefault();
+    const top = _openOverlays[_openOverlays.length - 1];
+    if (top.closeFn) top.closeFn(); else overlayClose(top.el);
+    return;
+  }
+  if (e.key === 'Tab' && _openOverlays.length) {               // 창 안에서만 Tab 이동
+    const top = _openOverlays[_openOverlays.length - 1].el;
+    const f = [...top.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled])')]
+      .filter(x => x.offsetParent !== null || x === document.activeElement);
+    if (!f.length) return;
+    const first = f[0], last = f[f.length - 1];
+    if (!top.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+    else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    return;
+  }
+  if (e.isComposing || e.keyCode === 229) return;
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.code === 'KeyK') {   // Ctrl/⌘ + K
+    if (!shellReady()) return;
+    e.preventDefault();
+    const s = $id('search-overlay');
+    if (s && s.classList.contains('open')) closeSearch(); else openSearch();
+    return;
+  }
+  if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || _openOverlays.length || isTypingTarget(e.target)) return;
+  if (!shellReady()) return;
+  if (e.code === 'Slash' && !e.shiftKey) { e.preventDefault(); openSearch(); }       // /
+  else if (e.code === 'KeyN' && !e.shiftKey) { e.preventDefault(); openQuickAdd(); } // N
+});
+
+// 빠른 추가 / 검색 창 HTML
+function extraOverlaysHtml() {
+  const radio = (name, v, label, checked, onchange) =>
+    `<label><input type="radio" name="${name}" value="${v}"${checked ? ' checked' : ''}${onchange ? ` onchange="${onchange}"` : ''}><span>${label}</span></label>`;
+  return `
+  <button type="button" class="fab" onclick="openQuickAdd()" aria-label="빠른 추가">${svgIcon('plus', 26)}</button>
+
+  <div class="sheet-overlay center-md" id="qa-overlay" onclick="if(event.target===this)closeQuickAdd()">
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="qa-title">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <h2 id="qa-title">빠른 추가</h2>
+        <button type="button" class="icon-btn sheet-close" onclick="closeQuickAdd()" aria-label="닫기">${svgIcon('close', 18)}</button>
+      </div>
+      <div class="qa-field"><label class="qa-label" for="qa-text">할일 내용</label>
+        <textarea id="qa-text" rows="2" placeholder="무엇을 해야 하나요?" onkeydown="qaKey(event)"></textarea></div>
+      <div class="qa-field"><span class="qa-label" id="qa-pri-l">우선순위</span>
+        <div class="seg pri" role="radiogroup" aria-labelledby="qa-pri-l">
+          ${radio('qa-pri', 'high', '높음')}${radio('qa-pri', 'medium', '보통', true)}${radio('qa-pri', 'low', '낮음')}
+        </div></div>
+      <div class="qa-field"><span class="qa-label" id="qa-when-l">날짜</span>
+        <div class="chips" role="radiogroup" aria-labelledby="qa-when-l">
+          ${radio('qa-when', 'today', '오늘', true, 'qaWhen()')}${radio('qa-when', 'tomorrow', '내일', false, 'qaWhen()')}${radio('qa-when', 'nextweek', '다음 주', false, 'qaWhen()')}${radio('qa-when', 'custom', '직접', false, 'qaWhen()')}
+        </div>
+        <input type="date" id="qa-date" style="display:none;margin-top:.5rem" aria-label="날짜 직접 선택" onchange="qaWhen()">
+        <div class="qa-hint" id="qa-date-hint" aria-live="polite"></div></div>
+      <div class="qa-row qa-field">
+        <div><label class="qa-label" for="qa-start">시작 시간</label><select id="qa-start"></select></div>
+        <div><label class="qa-label" for="qa-end">종료 시간</label><select id="qa-end"></select></div>
+      </div>
+      <div class="qa-field"><label class="qa-label" for="qa-project">연결 프로젝트 (선택)</label>
+        <select id="qa-project"><option value="">없음</option></select></div>
+      <div class="qa-err" id="qa-err" role="alert"></div>
+      <div class="qa-actions">
+        <button type="button" class="btn btn-outline" onclick="closeQuickAdd()">취소</button>
+        <button type="button" class="btn btn-primary" id="qa-submit" onclick="qaSubmit()">추가</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="palette-overlay" id="search-overlay" onclick="if(event.target===this)closeSearch()">
+    <div class="palette" role="dialog" aria-modal="true" aria-label="검색">
+      <div class="palette-input">
+        ${svgIcon('search', 18)}
+        <input id="search-input" type="text" role="combobox" aria-expanded="true" aria-controls="search-list" aria-autocomplete="list" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" placeholder="검색하거나 페이지로 이동" aria-label="검색어" oninput="onSearchInput()" onkeydown="searchKey(event)">
+        <kbd class="palette-esc">Esc</kbd>
+        <button type="button" class="icon-btn palette-close" onclick="closeSearch()" aria-label="검색 닫기">${svgIcon('close', 18)}</button>
+      </div>
+      <div class="palette-list" id="search-list" role="listbox" aria-label="검색 결과"></div>
+      <div class="sr-only" id="search-live" aria-live="polite"></div>
+      <div class="palette-foot"><span>↑↓ 이동</span><span>Enter 열기</span><span>Esc 닫기</span></div>
+    </div>
+  </div>`;
+}
+function bindShellExtras() {
+  const mac = /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent || '');
+  document.querySelectorAll('.js-kbd-search').forEach(k => { k.textContent = mac ? '⌘K' : 'Ctrl K'; });
+  const list = $id('search-list');
+  if (list) {
+    list.addEventListener('click', e => {
+      const el = e.target.closest('.palette-item');
+      if (el && _s.items[+el.dataset.i]) _s.items[+el.dataset.i].run();
+    });
+    list.addEventListener('mousemove', e => {
+      const el = e.target.closest('.palette-item');
+      if (el && +el.dataset.i !== _s.active) { _s.active = +el.dataset.i; searchActiveUpdate(false); }
+    });
+  }
+}
 
 // ===== 앱 셸: PC 사이드바 / 태블릿 아이콘 레일 / 모바일 상단바 + 하단 탭바 =====
 function renderShell() {
@@ -315,6 +679,12 @@ function renderShell() {
   const tiles = MENU.map(m => `
     <a href="${m.href}" class="menu-tile${m.admin ? ' admin-only' : ''}" data-nav="${m.href}"><span class="tile-ico">${svgIcon(m.icon, 18)}</span><span>${m.label}</span></a>`).join('');
 
+  const sideActions = `
+    <div class="side-actions">
+      <button type="button" class="side-btn primary" onclick="openQuickAdd()" title="빠른 추가 (N)">${svgIcon('plus', 18)}<span class="nav-label">빠른 추가</span><kbd class="nav-label">N</kbd></button>
+      <button type="button" class="side-btn" onclick="openSearch()" title="검색 (Ctrl K)">${svgIcon('search', 18)}<span class="nav-label">검색</span><kbd class="nav-label js-kbd-search">Ctrl K</kbd></button>
+    </div>`;
+
   const userBlock = `
     <div class="avatar js-avatar" aria-hidden="true"></div>
     <div class="side-user-info"><div class="js-user-email"></div><span class="badge js-user-badge"></span></div>`;
@@ -324,6 +694,7 @@ function renderShell() {
   wrap.innerHTML = `
   <aside class="sidebar" id="app-sidebar">
     <a class="brand" href="dashboard.html" aria-label="짱구's Desk 홈">${logoSvg(32)}<span class="brand-text">짱구's Desk</span></a>
+    ${sideActions}
     <nav class="side-nav" aria-label="주 메뉴">${sideGroups}</nav>
     <div class="side-user">
       <div class="side-user-top">${userBlock}</div>
@@ -337,6 +708,7 @@ function renderShell() {
   <header class="topbar">
     <a class="brand" href="dashboard.html" aria-label="짱구's Desk 홈">${logoSvg(28)}<span class="brand-text">짱구's Desk</span></a>
     <div class="topbar-actions">
+      <button type="button" class="icon-btn js-search-btn" onclick="openSearch()" aria-label="검색">${svgIcon('search', 18)}</button>
       <button type="button" class="icon-btn theme-btn" onclick="toggleTheme()"></button>
     </div>
   </header>
@@ -361,7 +733,8 @@ function renderShell() {
         <button type="button" class="btn btn-danger" onclick="logout()">${svgIcon('logout', 18)}로그아웃</button>
       </div>
     </div>
-  </div>`;
+  </div>
+  ${extraOverlaysHtml()}`;
   document.body.prepend(wrap);
 
   // head 보강: 노치 대응 + 아이콘
@@ -378,6 +751,7 @@ function renderShell() {
   initTheme();
   markActiveNav();
   updateInstallButtons();
+  bindShellExtras();
 }
 
 // ===== 공통 AUTH HTML =====
