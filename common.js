@@ -95,6 +95,7 @@ async function handleUser(user, onReady) {
   // 네비 업데이트 (사이드바 / 더보기 시트의 사용자 영역)
   document.body.classList.remove('auth-mode');
   document.body.classList.toggle('is-pending', currentRole === 'pending');
+  if (currentRole !== 'pending') startLeaveAlert(); else stopLeaveAlert();
   document.querySelectorAll('.js-user-email').forEach(el => { el.textContent = user.email; });
   document.querySelectorAll('.js-avatar').forEach(el => { el.textContent = (user.email || '?').charAt(0).toUpperCase(); });
   document.querySelectorAll('.js-user-badge').forEach(el => {
@@ -124,7 +125,7 @@ async function handleUser(user, onReady) {
 
 function showAuthSection() {
   document.body.classList.add('auth-mode');
-  closeMore(); closeSearch(); closeQuickAdd();
+  closeMore(); closeSearch(); closeQuickAdd(); closeWorkSettings(); stopLeaveAlert();
   const auth = document.getElementById('auth-section');
   const main = document.getElementById('main-section');
   if (auth) auth.style.display = 'block';
@@ -227,7 +228,14 @@ const ICON = {
   star4: '<path d="M12 3c.6 4.8 4.2 8.4 9 9-4.8.6-8.4 4.2-9 9-.6-4.8-4.2-8.4-9-9 4.8-.6 8.4-4.2 9-9z"/>',
   asterisk: '<path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9"/>',
   ext: '<path d="M7 17 17 7"/><path d="M8 7h9v9"/>',
-  building: '<path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/><path d="M9 11h.01M15 11h.01"/>'
+  building: '<path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/><path d="M9 11h.01M15 11h.01"/>',
+  sunrise: '<path d="M12 2v8"/><path d="m4.93 10.93 1.41 1.41"/><path d="M2 18h2"/><path d="M20 18h2"/><path d="m19.07 10.93-1.41 1.41"/><path d="M22 22H2"/><path d="m8 6 4-4 4 4"/><path d="M16 18a4 4 0 0 0-8 0"/>',
+  sunset: '<path d="M12 10V2"/><path d="m4.93 10.93 1.41 1.41"/><path d="M2 18h2"/><path d="M20 18h2"/><path d="m19.07 10.93-1.41 1.41"/><path d="M22 22H2"/><path d="m16 6-4 4-4-4"/><path d="M16 18a4 4 0 0 0-8 0"/>',
+  utensils: '<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/>',
+  coffee: '<path d="M10 2v2"/><path d="M14 2v2"/><path d="M6 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/>',
+  bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>',
+  bellOff: '<path d="M8.7 3A6 6 0 0 1 18 8a21.3 21.3 0 0 0 .6 5"/><path d="M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="m2 2 20 20"/>',
+  sliders: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>'
 };
 function svgIcon(name, size) {
   size = size || 18;
@@ -384,7 +392,7 @@ async function qaLoadProjects() {
 function openQuickAdd(prefill) {
   if (!shellReady()) return;
   const el = $id('qa-overlay'); if (!el) return;
-  closeSearch(); closeMore();
+  closeSearch(); closeMore(); closeWorkSettings();
   qaReset(typeof prefill === 'string' ? prefill : '');
   overlayOpen(el, $id('qa-text'), closeQuickAdd);
   qaLoadProjects();
@@ -463,6 +471,7 @@ function searchBuild() {
     .filter(t => ((t.full || t.name) + ' ' + t.alias.join(' ')).toLowerCase().includes(ql))
     .map(t => ({ group: '바로가기', icon: t.icon, title: t.full || t.name, sub: t.url.replace(/^https?:\/\//, '').replace(/\/.*$/, ''), ext: true,
                  run: () => { closeSearch(); window.open(t.url, '_blank', 'noopener'); } }));
+  if (!q || /퇴근|알림|근무|출근|설정/.test(q)) acts.push({ group: '작업', icon: 'bell', title: '퇴근 알림 설정', run: () => { closeSearch(); openWorkSettings(); } });
   const remote = SEARCH_KINDS.flatMap(k => _s.remote
     .filter(r => r && r.kind === k)
     .sort((a, b) => String(b.ref_date || '').localeCompare(String(a.ref_date || '')))
@@ -547,7 +556,7 @@ function searchKey(e) {
 function openSearch() {
   if (!shellReady()) return;
   const el = $id('search-overlay'); if (!el) return;
-  closeQuickAdd(); closeMore();
+  closeQuickAdd(); closeMore(); closeWorkSettings();
   $id('search-input').value = '';
   _s.active = 0; _s.remote = []; _s.loading = false; _s.error = false; _s.seq++;
   searchRender();
@@ -556,6 +565,211 @@ function openSearch() {
 function closeSearch() {
   clearTimeout(_s.timer); _s.seq++;
   const el = $id('search-overlay'); if (el) overlayClose(el);
+}
+
+// ===== 근무 시간 / 퇴근 알림 =====
+// 설정은 이 기기(브라우저)에만 저장됨. 기본값: 출근 08:00, 퇴근 17:00 (수요일 16:00), 5분 전 알림
+const WORK_KEY = 'icqa_work_v1', WORK_FIRED_KEY = 'icqa_leave_fired', WORK_SKIP_KEY = 'icqa_leave_skip';
+const WORK_DAYS = ['일', '월', '화', '수', '목', '금', '토'];
+const WORK_DEFAULT = { enabled: true, start: '08:00', notifyBefore: 5, leave: ['', '17:00', '17:00', '16:00', '17:00', '17:00', ''] };   // leave[요일(0=일)]
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+function pad2(n) { return String(n).padStart(2, '0'); }
+function hm(d) { return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
+function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* 저장 불가 환경이면 기본값으로 동작 */ } }
+function workLoad() {
+  let s = null; try { s = JSON.parse(lsGet(WORK_KEY) || 'null'); } catch (e) { s = null; }
+  const cfg = { enabled: WORK_DEFAULT.enabled, start: WORK_DEFAULT.start, notifyBefore: WORK_DEFAULT.notifyBefore, leave: WORK_DEFAULT.leave.slice() };
+  if (s && typeof s === 'object') {
+    if (typeof s.enabled === 'boolean') cfg.enabled = s.enabled;
+    if (TIME_RE.test(s.start || '')) cfg.start = s.start;
+    if (Number.isInteger(s.notifyBefore) && s.notifyBefore >= 1 && s.notifyBefore <= 120) cfg.notifyBefore = s.notifyBefore;
+    if (Array.isArray(s.leave)) for (let i = 0; i < 7; i++) { const v = s.leave[i]; if (v === '' || TIME_RE.test(v || '')) cfg.leave[i] = v; }
+  }
+  return cfg;
+}
+function workSave(cfg) { lsSet(WORK_KEY, JSON.stringify(cfg)); window.dispatchEvent(new CustomEvent('work-changed')); }
+function atTime(base, hhmm) { const [h, m] = hhmm.split(':').map(Number); return new Date(base.getFullYear(), base.getMonth(), base.getDate(), h, m, 0, 0); }
+function fmtMinsLeft(m) { const h = Math.floor(m / 60), r = m % 60; if (h > 0 && r > 0) return `${h}시간 ${r}분`; if (h > 0) return `${h}시간`; return `${r}분`; }
+
+// 지금 상태: rest(쉬는 날) / before(출근 전) / working / soon(알림 구간) / after(퇴근 후)
+function workInfo(now) {
+  now = now || new Date();
+  const cfg = workLoad(), dow = now.getDay(), leaveStr = cfg.leave[dow];
+  const out = { cfg, dow, state: 'rest', leaveAt: null, startAt: null, notifyAt: null, minsLeft: null, skipped: lsGet(WORK_SKIP_KEY) === ymdLocal(now) };
+  if (!leaveStr) return out;
+  out.leaveAt = atTime(now, leaveStr);
+  out.startAt = atTime(now, cfg.start);
+  out.notifyAt = new Date(out.leaveAt.getTime() - cfg.notifyBefore * 60000);
+  if (now >= out.leaveAt) out.state = 'after';
+  else if (now >= out.notifyAt) out.state = 'soon';
+  else if (now < out.startAt) out.state = 'before';
+  else out.state = 'working';
+  out.minsLeft = Math.max(0, Math.ceil((out.leaveAt - now) / 60000));
+  return out;
+}
+
+// ----- 알림 보내기 -----
+function leavePermission() { return ('Notification' in window) ? Notification.permission : 'unsupported'; }
+async function leaveAskPermission() {
+  if (!('Notification' in window)) return 'unsupported';
+  if (Notification.permission === 'default') { try { return await Notification.requestPermission(); } catch (e) { return Notification.permission; } }
+  return Notification.permission;
+}
+// 안드로이드 크롬은 new Notification() 이 막혀 있어서 서비스워커로 띄움
+async function systemNotify(title, body) {
+  if (leavePermission() !== 'granted') return false;
+  const opts = { body, icon: '/icons/icon-192.png', badge: '/icons/icon-192.png', tag: 'leave-alert', renotify: true, requireInteraction: true, vibrate: [200, 100, 200], data: { url: '/dashboard.html' } };
+  try {
+    if ('serviceWorker' in navigator) {
+      const reg = await Promise.race([navigator.serviceWorker.ready, new Promise(r => setTimeout(() => r(null), 3000))]);
+      if (reg && reg.showNotification) { await reg.showNotification(title, opts); return true; }
+    }
+  } catch (e) { /* 아래 방법으로 시도 */ }
+  try { new Notification(title, opts); return true; } catch (e) { return false; }
+}
+function leaveToast(title, lines) {
+  const old = $id('leave-toast'); if (old) old.remove();
+  const el = document.createElement('div');
+  el.id = 'leave-toast'; el.className = 'leave-toast'; el.setAttribute('role', 'alert');
+  const ic = document.createElement('span'); ic.className = 'lt-ico'; ic.innerHTML = svgIcon('bell', 20);
+  const tx = document.createElement('div'); tx.className = 'lt-text';
+  const t = document.createElement('strong'); t.textContent = title; tx.appendChild(t);
+  lines.forEach(l => { const d = document.createElement('div'); d.textContent = l; tx.appendChild(d); });
+  const act = document.createElement('div'); act.className = 'lt-actions';
+  const go = document.createElement('a'); go.href = 'todo.html'; go.className = 'btn btn-outline btn-sm'; go.textContent = '할일 보기';
+  const ok = document.createElement('button'); ok.type = 'button'; ok.className = 'btn btn-primary btn-sm'; ok.textContent = '확인'; ok.onclick = () => el.remove();
+  act.appendChild(go); act.appendChild(ok);
+  el.appendChild(ic); el.appendChild(tx); el.appendChild(act);
+  document.body.appendChild(el);
+}
+let _titleBase = null;
+function flashTitle(msg) {                                   // 탭이 가려져 있으면 탭 제목으로도 알림
+  if (!document.hidden) return;
+  if (_titleBase === null) _titleBase = document.title;
+  document.title = '⏰ ' + msg;
+  const restore = () => { if (!document.hidden) { if (_titleBase !== null) document.title = _titleBase; _titleBase = null; document.removeEventListener('visibilitychange', restore); } };
+  document.addEventListener('visibilitychange', restore);
+}
+async function leaveRemainingTodos(now) {                   // 오늘 남은 할일 수 (못 가져오면 생략)
+  try {
+    const q = sb.from('todos').select('id', { count: 'exact', head: true }).eq('user_id', currentUser.id).eq('date', ymdLocal(now)).eq('done', false);
+    const res = await Promise.race([Promise.resolve(q), new Promise(r => setTimeout(() => r(null), 2500))]);
+    return res && !res.error && typeof res.count === 'number' ? res.count : null;
+  } catch (e) { return null; }
+}
+async function leaveNotify(info, now, isTest) {
+  const mins = isTest ? info.cfg.notifyBefore : info.minsLeft;
+  const leaveStr = info.leaveAt ? hm(info.leaveAt) : '';
+  const remain = isTest ? null : await leaveRemainingTodos(now);
+  const title = (isTest ? '[테스트] ' : '') + `퇴근 ${mins}분 전이에요`;
+  const lines = [`${leaveStr || '--:--'} 퇴근 · 하던 일을 정리해 볼까요?`];
+  if (remain > 0) lines.push(`오늘 할일 ${remain}개가 남아 있어요`);
+  else if (remain === 0) lines.push('오늘 할일을 모두 끝냈어요');
+  leaveToast(title, lines);
+  flashTitle(title);
+  await systemNotify(title, lines.join('\n'));
+}
+
+// ----- 스케줄러: 로그인한 모든 페이지에서 15초마다 확인 -----
+let _leaveTimer = null;
+function startLeaveAlert() {
+  if (_leaveTimer) return;
+  leaveCheck();
+  _leaveTimer = setInterval(leaveCheck, 15000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) leaveCheck(); });   // 절전/탭 복귀 때 바로 확인
+  window.addEventListener('focus', leaveCheck);
+}
+function stopLeaveAlert() { clearInterval(_leaveTimer); _leaveTimer = null; }
+async function leaveCheck() {
+  if (!shellReady()) return;
+  const now = new Date(), info = workInfo(now);
+  if (!info.cfg.enabled || info.skipped || info.state !== 'soon') return;   // 알림 구간(퇴근 N분 전 ~ 퇴근 시각)에서만
+  const today = ymdLocal(now);
+  const fire = async () => {
+    if (lsGet(WORK_FIRED_KEY) === today) return;                           // 하루에 한 번만
+    lsSet(WORK_FIRED_KEY, today);
+    await leaveNotify(info, now, false);
+  };
+  if (navigator.locks && navigator.locks.request) await navigator.locks.request('icqa-leave-alert', fire);   // 탭을 여러 개 열어도 한 번만
+  else await fire();
+}
+function toggleLeaveSkip() {
+  const today = ymdLocal(new Date());
+  if (lsGet(WORK_SKIP_KEY) === today) lsSet(WORK_SKIP_KEY, ''); else lsSet(WORK_SKIP_KEY, today);
+  window.dispatchEvent(new CustomEvent('work-changed'));
+}
+async function toggleLeaveAlert() {
+  const cfg = workLoad();
+  cfg.enabled = !cfg.enabled;
+  if (cfg.enabled) {                                                       // 켤 때 브라우저 알림 권한 요청 (클릭 직후라 가능)
+    const p = await leaveAskPermission();
+    if (p === 'denied') showToast('브라우저 알림이 차단돼 있어요. 화면 안 알림만 나와요');
+    else if (p === 'unsupported') showToast('이 브라우저는 시스템 알림을 못 써요. 화면 안 알림만 나와요');
+  }
+  workSave(cfg);
+}
+
+// ----- 설정 창 -----
+const WK_ORDER = [1, 2, 3, 4, 5, 6, 0];   // 월~일
+function wkPermUi() {
+  const p = leavePermission(), el = $id('wk-perm'), btn = $id('wk-perm-btn');
+  if (!el || !btn) return;
+  btn.style.display = p === 'default' ? '' : 'none';
+  el.textContent = {
+    granted: '브라우저 알림이 허용돼 있어요. 탭이 백그라운드에 있어도 알림이 떠요.',
+    default: '브라우저 알림을 허용하면 다른 창을 보고 있을 때도 알림이 떠요.',
+    denied: '브라우저에서 알림이 차단돼 있어요. 주소창 왼쪽 자물쇠 → 알림 → 허용으로 바꾸면 돼요. 그 전에는 화면 안 알림만 나와요.',
+    unsupported: '이 브라우저에서는 시스템 알림을 쓸 수 없어요. (아이폰은 홈 화면에 추가한 앱에서만 가능) 화면 안 알림은 그대로 나와요.'
+  }[p];
+}
+function wkFill() {
+  const cfg = workLoad();
+  $id('wk-enabled').checked = cfg.enabled;
+  $id('wk-start').value = cfg.start;
+  $id('wk-before').value = String(cfg.notifyBefore);
+  if (!$id('wk-before').value) { $id('wk-before').insertAdjacentHTML('beforeend', `<option value="${cfg.notifyBefore}">${cfg.notifyBefore}분 전</option>`); $id('wk-before').value = String(cfg.notifyBefore); }
+  WK_ORDER.forEach(d => { $id('wk-leave-' + d).value = cfg.leave[d] || ''; });
+  $id('wk-err').classList.remove('show'); $id('wk-err').textContent = '';
+  wkPermUi();
+}
+function openWorkSettings() {
+  if (!shellReady()) return;
+  const el = $id('work-overlay'); if (!el) return;
+  closeSearch(); closeMore(); closeQuickAdd();
+  wkFill();
+  overlayOpen(el, $id('wk-enabled'), closeWorkSettings);
+}
+function closeWorkSettings() { const el = $id('work-overlay'); if (el) overlayClose(el); }
+async function wkAsk() { await leaveAskPermission(); wkPermUi(); }
+function wkRead() {
+  const cfg = { enabled: $id('wk-enabled').checked, start: $id('wk-start').value, notifyBefore: parseInt($id('wk-before').value, 10), leave: ['', '', '', '', '', '', ''] };
+  WK_ORDER.forEach(d => { cfg.leave[d] = $id('wk-leave-' + d).value || ''; });
+  return cfg;
+}
+function wkSave() {
+  const cfg = wkRead(), err = $id('wk-err');
+  const fail = (m, id) => { err.textContent = m; err.classList.add('show'); if (id && $id(id)) $id(id).focus(); };
+  err.classList.remove('show');
+  if (!TIME_RE.test(cfg.start)) return fail('출근 시각을 입력해 주세요', 'wk-start');
+  for (const d of WK_ORDER) {
+    const v = cfg.leave[d];
+    if (v && v <= cfg.start) return fail(`${WORK_DAYS[d]}요일 퇴근 시각은 출근(${cfg.start})보다 늦어야 해요`, 'wk-leave-' + d);
+  }
+  workSave(cfg);
+  const now = new Date(), inf = workInfo(now);                              // 알림 시각을 더 늦게 바꾼 경우, 오늘 알림을 다시 받을 수 있게
+  if (lsGet(WORK_FIRED_KEY) === ymdLocal(now) && inf.notifyAt && now < inf.notifyAt) lsSet(WORK_FIRED_KEY, '');
+  closeWorkSettings();
+  showToast('✅ 근무 시간을 저장했어요');
+}
+async function wkTest() {
+  const cfg = wkRead();
+  if (cfg.enabled) await leaveAskPermission();
+  wkPermUi();
+  const now = new Date(), inf = workInfo(now);
+  inf.cfg = Object.assign({}, inf.cfg, { notifyBefore: Number.isInteger(cfg.notifyBefore) ? cfg.notifyBefore : 5 });
+  if (!inf.leaveAt) inf.leaveAt = atTime(now, '17:00');
+  await leaveNotify(inf, now, true);
 }
 
 // ===== 단축키 =====
@@ -629,6 +843,34 @@ function extraOverlaysHtml() {
       <div class="qa-actions">
         <button type="button" class="btn btn-outline" onclick="closeQuickAdd()">취소</button>
         <button type="button" class="btn btn-primary" id="qa-submit" onclick="qaSubmit()">추가</button>
+      </div>
+    </div>
+  </div>
+
+
+  <div class="sheet-overlay center-md" id="work-overlay" onclick="if(event.target===this)closeWorkSettings()">
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="wk-title">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <h2 id="wk-title">퇴근 알림 설정</h2>
+        <button type="button" class="icon-btn sheet-close" onclick="closeWorkSettings()" aria-label="닫기">${svgIcon('close', 18)}</button>
+      </div>
+      <label class="wk-switch"><input type="checkbox" id="wk-enabled"><span>퇴근 알림 사용</span></label>
+      <div class="qa-hint wk-perm" id="wk-perm" aria-live="polite"></div>
+      <button type="button" class="btn btn-outline btn-sm" id="wk-perm-btn" onclick="wkAsk()" style="display:none;margin-bottom:.9rem">브라우저 알림 허용하기</button>
+      <div class="qa-row qa-field">
+        <div><label class="qa-label" for="wk-start">출근 시각</label><input type="time" id="wk-start"></div>
+        <div><label class="qa-label" for="wk-before">알림 시점</label>
+          <select id="wk-before"><option value="5">5분 전</option><option value="10">10분 전</option><option value="15">15분 전</option><option value="30">30분 전</option></select></div>
+      </div>
+      <div class="qa-field"><span class="qa-label">요일별 퇴근 시각 (비워두면 쉬는 날)</span>
+        <div class="wk-days"><label class="wk-day"><span>월</span><input type="time" id="wk-leave-1" aria-label="월요일 퇴근 시각"></label><label class="wk-day"><span>화</span><input type="time" id="wk-leave-2" aria-label="화요일 퇴근 시각"></label><label class="wk-day"><span>수</span><input type="time" id="wk-leave-3" aria-label="수요일 퇴근 시각"></label><label class="wk-day"><span>목</span><input type="time" id="wk-leave-4" aria-label="목요일 퇴근 시각"></label><label class="wk-day"><span>금</span><input type="time" id="wk-leave-5" aria-label="금요일 퇴근 시각"></label><label class="wk-day"><span>토</span><input type="time" id="wk-leave-6" aria-label="토요일 퇴근 시각"></label><label class="wk-day"><span>일</span><input type="time" id="wk-leave-0" aria-label="일요일 퇴근 시각"></label></div></div>
+      <div class="qa-hint">설정은 이 기기의 브라우저에만 저장돼요. 공휴일·연차는 자동으로 구분하지 않으니, 그날은 화면의 &quot;오늘은 끄기&quot;를 눌러 주세요.</div>
+      <div class="qa-err" id="wk-err" role="alert"></div>
+      <div class="qa-actions">
+        <button type="button" class="btn btn-outline" onclick="wkTest()">테스트 알림</button>
+        <button type="button" class="btn btn-outline" onclick="closeWorkSettings()">취소</button>
+        <button type="button" class="btn btn-primary" onclick="wkSave()">저장</button>
       </div>
     </div>
   </div>
