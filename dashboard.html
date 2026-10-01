@@ -82,6 +82,22 @@
 [data-theme="dark"] .tool-notion{--tc:#e6edf3;}   [data-theme="light"] .tool-notion{--tc:#1f2328;}
 .tool-icqa{--tc:var(--purple);}
 
+.link-btn{background:none;border:none;color:var(--accent);font-family:inherit;font-size:.8rem;cursor:pointer;padding:.5rem 0;min-height:44px;min-width:44px;white-space:nowrap;}
+.panel-head .link-btn{text-align:right;}
+.link-btn:hover{text-decoration:underline;}
+
+/* 나의 기준 (비공개 메모) */
+.rule-label{font-size:.7rem;font-weight:700;letter-spacing:.04em;color:var(--accent);margin-bottom:.25rem;}
+.rule-today{font-size:.92rem;font-weight:600;line-height:1.6;}
+.rule-lead{font-size:.8rem;color:var(--text-muted);margin-bottom:.5rem;line-height:1.6;}
+.rule-list{margin:0 0 .85rem;padding-left:1.15rem;}
+.rule-list li{margin:.35rem 0;font-size:.86rem;line-height:1.6;}
+.rule-tail{border-left:3px solid var(--accent);padding:.15rem 0 .15rem .8rem;margin:0;font-size:.84rem;line-height:1.7;color:var(--text-muted);}
+.rule-tail p{margin:0 0 .5rem;}
+.rule-tail p:last-child{margin-bottom:0;}
+.rule-foot{display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-top:.15rem;}
+.rule-empty{font-size:.84rem;color:var(--text-muted);line-height:1.6;}
+
 /* 통계 카드 */
 .stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem;margin-bottom:1.25rem;}
 @media(min-width:768px){.stat-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem;}}
@@ -228,14 +244,40 @@
         </div>
       </div>
 
-      <aside class="dash-side" aria-label="오늘 일정">
+      <aside class="dash-side" aria-label="오늘 일정과 나의 기준">
         <section class="panel" aria-labelledby="h-cal">
           <div class="panel-head"><h2 id="h-cal">오늘 일정</h2><span class="panel-note">Google 캘린더</span></div>
           <div id="dash-cal"><div class="empty">불러오는 중...</div></div>
         </section>
+
+        <!-- 나의 기준: 내용은 코드가 아니라 비공개 DB(pinned_notes)에서 불러옴 -->
+        <section class="panel" aria-labelledby="h-rule">
+          <div class="panel-head"><h2 id="h-rule">나의 기준</h2><button type="button" class="link-btn" id="rule-edit" onclick="openRuleEdit()">편집</button></div>
+          <div id="rule-body"><div class="empty">불러오는 중...</div></div>
+        </section>
       </aside>
     </div>
 
+  </div>
+</div>
+
+<div class="sheet-overlay center-md" id="rule-overlay" onclick="if(event.target===this)closeRuleEdit()">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="rule-title">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2 id="rule-title">나의 기준 편집</h2>
+      <button type="button" class="icon-btn sheet-close" onclick="closeRuleEdit()" aria-label="닫기"></button>
+    </div>
+    <div class="qa-field">
+      <label class="qa-label" for="rule-text">내용</label>
+      <textarea id="rule-text" rows="12" placeholder="한 줄에 하나씩 적어요"></textarea>
+      <div class="qa-hint">줄 앞에 • 또는 - 를 붙이면 목록으로 보여요. 목록 위의 글은 머리말, 아래의 글은 마무리 문구로 보여요. 이 내용은 내 계정에만 저장돼요.</div>
+    </div>
+    <div class="qa-err" id="rule-err" role="alert"></div>
+    <div class="qa-actions">
+      <button type="button" class="btn btn-outline" onclick="closeRuleEdit()">취소</button>
+      <button type="button" class="btn btn-primary" id="rule-save" onclick="saveRule()">저장</button>
+    </div>
   </div>
 </div>
 
@@ -465,7 +507,88 @@ async function loadDashCalendar(now) {
 }
 
 // ---------- 시작 ----------
+// ---------- 나의 기준 (비공개 메모: pinned_notes 테이블) ----------
+const RULE_SLUG = 'my-rules';
+const _rule = { text: '', loaded: false, error: false, loading: false, open: false };
+try { _rule.open = localStorage.getItem('icqa_rule_open') === '1'; } catch (e) {}
+
+function parseRule(text) {
+  const lead = [], bullets = [], tail = [];
+  let seen = false;
+  String(text || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean).forEach(l => {
+    const m = l.match(/^[•·\-\*]\s*(.+)$/);
+    if (m) { bullets.push(m[1]); seen = true; } else (seen ? tail : lead).push(l);
+  });
+  return { lead, bullets, tail };
+}
+function ruleToday(n) {                                   // 하루에 하나씩 돌려가며 보여줌 (날짜 기준이라 하루 종일 같음)
+  const now = new Date();
+  const doy = Math.floor((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(now.getFullYear(), 0, 0)) / 86400000);
+  return doy % n;
+}
+function renderRule() {
+  const el = document.getElementById('rule-body'); if (!el) return;
+  if (_rule.error) { el.innerHTML = '<div class="rule-empty">저장 공간을 불러오지 못했어요. (05번 SQL을 실행했는지 확인해 주세요)</div>'; return; }
+  if (!_rule.loaded) { el.innerHTML = '<div class="empty">불러오는 중...</div>'; return; }
+  const { lead, bullets, tail } = parseRule(_rule.text);
+  if (!lead.length && !bullets.length && !tail.length) { el.innerHTML = '<div class="rule-empty">아직 적어둔 기준이 없어요. 오른쪽 위 <b>편집</b>을 눌러 적어보세요.</div>'; return; }
+  if (!bullets.length) {                                    // 목록이 없으면 전체를 그대로 보여줌
+    el.innerHTML = `<div class="rule-lead" style="margin:0">${[...lead, ...tail].map(escHtml).join('<br>')}</div>`; return;
+  }
+  const open = _rule.open;
+  let html = '';
+  if (!open) {
+    html += `<div class="rule-label">오늘의 한 줄</div><div class="rule-today">${escHtml(bullets[ruleToday(bullets.length)])}</div>`;
+  } else {
+    if (lead.length) html += `<div class="rule-lead">${lead.map(escHtml).join('<br>')}</div>`;
+    html += `<ul class="rule-list">${bullets.map(b => `<li>${escHtml(b)}</li>`).join('')}</ul>`;
+    if (tail.length) html += `<blockquote class="rule-tail">${tail.map(t => `<p>${escHtml(t)}</p>`).join('')}</blockquote>`;
+  }
+  html += `<div class="rule-foot"><button type="button" class="link-btn" id="rule-toggle" aria-expanded="${open}" aria-controls="rule-body" onclick="toggleRule()">${open ? '접기' : '전체 보기'}</button></div>`;
+  el.innerHTML = html;
+}
+function toggleRule() {
+  _rule.open = !_rule.open;
+  try { localStorage.setItem('icqa_rule_open', _rule.open ? '1' : '0'); } catch (e) {}
+  renderRule();
+  const t = document.getElementById('rule-toggle'); if (t) t.focus({ preventScroll: true });
+}
+async function loadRule() {
+  if (_rule.loaded || _rule.loading) return;
+  _rule.loading = true;
+  try {
+    const { data, error } = await sb.from('pinned_notes').select('content').eq('user_id', currentUser.id).eq('slug', RULE_SLUG).maybeSingle();
+    if (error) throw error;
+    _rule.text = data && data.content ? data.content : ''; _rule.error = false; _rule.loaded = true;
+  } catch (e) { _rule.error = true; }
+  _rule.loading = false;
+  renderRule();
+}
+function openRuleEdit() {
+  const el = document.getElementById('rule-overlay'); if (!el || _rule.error) return;
+  document.getElementById('rule-text').value = _rule.text || '';
+  const err = document.getElementById('rule-err'); err.classList.remove('show'); err.textContent = '';
+  const btn = document.getElementById('rule-save'); btn.disabled = false; btn.textContent = '저장';
+  overlayOpen(el, document.getElementById('rule-text'), closeRuleEdit);
+}
+function closeRuleEdit() { const el = document.getElementById('rule-overlay'); if (el) overlayClose(el); }
+async function saveRule() {
+  const btn = document.getElementById('rule-save'), err = document.getElementById('rule-err');
+  const text = document.getElementById('rule-text').value.replace(/\s+$/g, '').replace(/^\s+/, '');
+  btn.disabled = true; btn.textContent = '저장 중...'; err.classList.remove('show');
+  let failed = false;
+  try {
+    const { error } = await sb.from('pinned_notes').upsert({ user_id: currentUser.id, slug: RULE_SLUG, title: '나의 기준', content: text }, { onConflict: 'user_id,slug' });
+    failed = !!error;
+  } catch (e) { failed = true; }
+  btn.disabled = false; btn.textContent = '저장';
+  if (failed) { err.textContent = '저장하지 못했어요. 잠시 후 다시 시도해 주세요'; err.classList.add('show'); return; }
+  _rule.text = text; _rule.loaded = true; _rule.error = false;
+  closeRuleEdit(); renderRule(); showToast('✅ 저장했어요');
+}
+
 // ---------- 바로가기 ----------
+document.addEventListener('DOMContentLoaded', () => { const c = document.querySelector('#rule-overlay .sheet-close'); if (c) c.innerHTML = svgIcon('close', 18); });
 function renderTools() {
   const el = document.getElementById('dash-tools');
   if (!el || el.dataset.ready) return;
@@ -543,6 +666,8 @@ async function initDashboard() {
   clockDay = ymd(now);
   clockStart();
   renderTools();
+  renderRule();
+  loadRule();
   const days = ['일', '월', '화', '수', '목', '금', '토'];
   document.getElementById('dash-date').textContent = `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일 ${days[now.getDay()]}요일`;
   applyGreeting(now);
