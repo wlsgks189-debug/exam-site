@@ -141,6 +141,8 @@ document.addEventListener('click', e => { if (e.target.id === 'edit-modal') clos
 async function initTodo() {
   const today = new Date();
   const dateEl = document.getElementById('todo-date');
+  const qd = new URLSearchParams(location.search).get('date');   // 검색 결과에서 날짜를 지정해 들어온 경우
+  if (dateEl && /^\d{4}-\d{2}-\d{2}$/.test(qd || '')) dateEl.value = qd;
   if (dateEl && !dateEl.value) {
     dateEl.value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
   }
@@ -405,6 +407,9 @@ function toggleMonth(key) {
   body.style.display = hidden ? 'block' : 'none';
   if (arrow) arrow.textContent = hidden ? '▼' : '▶';
 }
+
+// 빠른 추가로 할일이 생기면 목록 새로고침
+window.addEventListener('todo-added', () => { loadTodos(); loadIncompleteTodos(); });
 
 function fmtTime(iso) {
   if (!iso) return '';

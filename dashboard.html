@@ -18,7 +18,20 @@
 @media(min-width:1024px){#pwa-banner-area{max-width:1280px;}}
 
 /* 인사말 */
-.dash-head{margin-bottom:1rem;}
+.dash-head{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:.75rem 1.5rem;margin-bottom:1rem;}
+.dash-head-text{min-width:0;}
+
+/* 디지털 시계 */
+.clock{display:flex;align-items:baseline;gap:.15rem;padding:.55rem 1rem;background:var(--surface);border:1px solid var(--border);border-radius:12px;line-height:1;white-space:nowrap;
+  font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Roboto Mono','Liberation Mono',monospace;font-variant-numeric:tabular-nums;}
+.clk-main{font-size:2.4rem;font-weight:700;letter-spacing:.02em;color:var(--text);}
+.clk-sec{font-size:1.3rem;font-weight:600;color:var(--accent);}
+.clk-colon{animation:clk-blink 1s steps(1) infinite;}
+@keyframes clk-blink{50%{opacity:.25;}}
+@media(max-width:767px){
+  .clock{width:100%;justify-content:center;padding:.5rem .8rem;}
+  .clk-main{font-size:2.2rem;}
+}
 .dash-date{font-size:.8rem;color:var(--text-muted);}
 .dash-title{font-size:1.5rem;font-weight:700;margin-top:.15rem;}
 
@@ -34,6 +47,19 @@
 .dash-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:1.25rem;}
 @media(min-width:1200px){.dash-layout{grid-template-columns:minmax(0,1fr) 320px;}}
 .dash-side{display:flex;flex-direction:column;gap:1.25rem;}
+
+.tools-label{font-size:.78rem;font-weight:700;color:var(--text-muted);margin-bottom:.5rem;}
+.tools{display:grid;grid-template-columns:repeat(var(--n,5),minmax(0,1fr));gap:.5rem;margin-bottom:1.25rem;}
+@media(min-width:768px){.tools{grid-template-columns:repeat(var(--n,5),6.5rem);justify-content:start;gap:.6rem;}}
+.tool{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.4rem;min-height:72px;padding:.55rem .25rem;background:var(--surface);border:1px solid var(--border);border-radius:12px;text-decoration:none;color:var(--text);font-size:.74rem;font-weight:600;line-height:1.2;transition:border-color .15s;}
+.tool:hover{border-color:var(--accent);}
+.tool-ico{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--tc);background:color-mix(in srgb,var(--tc) 16%,transparent);}
+.tool-name{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+[data-theme="dark"] .tool-gemini{--tc:#8ab4f8;}   [data-theme="light"] .tool-gemini{--tc:#1967d2;}
+[data-theme="dark"] .tool-chatgpt{--tc:#3ecf9e;}  [data-theme="light"] .tool-chatgpt{--tc:#0f7b5f;}
+[data-theme="dark"] .tool-claude{--tc:#e08a67;}   [data-theme="light"] .tool-claude{--tc:#b5532f;}
+[data-theme="dark"] .tool-notion{--tc:#e6edf3;}   [data-theme="light"] .tool-notion{--tc:#1f2328;}
+.tool-icqa{--tc:var(--purple);}
 
 /* 통계 카드 */
 .stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem;margin-bottom:1.25rem;}
@@ -106,8 +132,15 @@
   <div class="container wide">
 
     <div class="dash-head">
-      <div class="dash-date" id="dash-date"></div>
-      <h1 class="dash-title" id="dash-greeting"></h1>
+      <div class="dash-head-text">
+        <div class="dash-date" id="dash-date"></div>
+        <h1 class="dash-title" id="dash-greeting"></h1>
+      </div>
+      <!-- 숫자는 1초마다 바뀌므로 화면 낭독기에는 읽히지 않게 하고, 분이 바뀔 때만 라벨을 갱신 -->
+      <div class="clock" id="dash-clock" role="img" aria-label="현재 시각">
+        <span class="clk-main" aria-hidden="true"><span id="clk-h">--</span><span class="clk-colon">:</span><span id="clk-m">--</span></span>
+        <span class="clk-sec" aria-hidden="true">:<span id="clk-s">--</span></span>
+      </div>
     </div>
 
     <!-- 마감 임박 경고 -->
@@ -115,6 +148,10 @@
 
     <div class="dash-layout">
       <div class="dash-main">
+
+        <!-- 바로가기 (목록은 common.js 의 TOOL_LINKS) -->
+        <div class="tools-label" id="tools-label">바로가기</div>
+        <nav class="tools" id="dash-tools" aria-labelledby="tools-label"></nav>
 
         <!-- 통계 -->
         <div class="stat-grid">
@@ -178,6 +215,8 @@
 window.addEventListener('DOMContentLoaded', () => {
   initPage(() => { initDashboard(); });
 });
+// 빠른 추가로 할일이 생기면 대시보드도 새로고침
+window.addEventListener('todo-added', () => { if (currentUser) initDashboard(); });
 
 // ---------- 작은 도우미들 ----------
 const pad = n => String(n).padStart(2, '0');
@@ -367,8 +406,56 @@ async function loadDashCalendar(now) {
 }
 
 // ---------- 시작 ----------
+// ---------- 바로가기 ----------
+function renderTools() {
+  const el = document.getElementById('dash-tools');
+  if (!el || el.dataset.ready) return;
+  el.dataset.ready = '1';
+  el.style.setProperty('--n', Math.min(TOOL_LINKS.length, 5));   // 한 줄에 최대 5개, 넘으면 다음 줄
+  el.innerHTML = TOOL_LINKS.map(t => {
+    const full = t.full || t.name;
+    return `<a class="tool tool-${escHtml(t.id)}" href="${escHtml(t.url)}" target="_blank" rel="noopener noreferrer" title="${escHtml(full)}">
+    <span class="tool-ico" aria-hidden="true">${svgIcon(t.icon, 20)}</span>
+    <span class="tool-name" aria-hidden="true">${escHtml(t.name)}</span>
+    <span class="sr-only">${escHtml(full)} (새 탭에서 열림)</span>
+  </a>`;
+  }).join('');
+}
+
+// ---------- 디지털 시계 ----------
+let clockTimer = null, clockStarted = false, clockDay = '';
+function clockTick() {
+  const now = new Date();
+  const set = (id, v) => { const el = document.getElementById(id); if (el && el.textContent !== v) el.textContent = v; };
+  set('clk-h', pad(now.getHours())); set('clk-m', pad(now.getMinutes())); set('clk-s', pad(now.getSeconds()));
+  const box = document.getElementById('dash-clock');
+  const label = `현재 시각 ${now.getHours()}시 ${now.getMinutes()}분`;
+  if (box && box.getAttribute('aria-label') !== label) box.setAttribute('aria-label', label);
+  const greet = document.getElementById('dash-greeting');
+  const g = greetingFor(now.getHours());
+  if (greet && greet.textContent !== g) greet.textContent = g;
+  // 자정을 넘겨 켜둔 화면이면 날짜와 오늘 할일을 새로 불러옴
+  const day = ymd(now);
+  if (clockDay && day !== clockDay) initDashboard();
+  clockSchedule();
+}
+function clockSchedule() {
+  clearTimeout(clockTimer);
+  if (document.hidden) return;                                   // 탭이 가려져 있으면 멈춤 (배터리 절약)
+  clockTimer = setTimeout(clockTick, 1000 - (Date.now() % 1000) + 5);   // 정확히 초가 바뀌는 시점에 맞춤
+}
+function clockStart() {
+  if (clockStarted) return;
+  clockStarted = true;
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) clockTick(); else clearTimeout(clockTimer); });
+  clockTick();
+}
+
 async function initDashboard() {
   const now = new Date();
+  clockDay = ymd(now);
+  clockStart();
+  renderTools();
   const days = ['일', '월', '화', '수', '목', '금', '토'];
   document.getElementById('dash-date').textContent = `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일 ${days[now.getDay()]}요일`;
   document.getElementById('dash-greeting').textContent = greetingFor(now.getHours());
