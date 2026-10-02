@@ -777,6 +777,21 @@ async function wkTest() {
   await leaveNotify(inf, now, true);
 }
 
+// ===== DB 오류를 사람이 알아볼 수 있게 풀어서 알려줌 =====
+// 어떤 SQL 을 실행해야 하는지까지 안내 (Supabase 오류 메시지를 보고 판단)
+function sqlHint(err) {
+  const m = String(err && (err.message || err.details || err.hint) || '').trim();
+  const code = String(err && err.code || '');
+  const all = m + ' ' + code;
+  if (!m && !code) return '';
+  if (/column/i.test(all) && /kinds|kind_dates|\bkind\b/i.test(all)) return '컬럼이 없어요 → Supabase에서 08번 SQL(필기·실기 구분)을 실행해 주세요.';
+  if (/column/i.test(all) && /subjects|status|done_at|group_name|\blink\b|\bsubject\b/i.test(all)) return '컬럼이 없어요 → Supabase에서 07번 SQL(시험 회차)을 실행해 주세요.';
+  if (/(exam_items|exam_schedules|checklist_)/i.test(all) && /(does not exist|schema cache|PGRST205|42P01)/i.test(all)) return '테이블을 못 찾았어요 → 07번 SQL을 아직 안 돌렸다면 실행해 주세요. 이미 돌렸다면 SQL Editor에서 notify pgrst, \'reload schema\'; 를 한 번 실행한 뒤 새로고침해 보세요.';
+  if (/42501|permission denied|row-level security|violates row-level/i.test(all)) return '권한이 없어요 → 승인된 계정으로 로그인했는지, 00번 통합 SQL을 실행했는지 확인해 주세요.';
+  if (/JWT|expired|401/i.test(all)) return '로그인이 만료됐을 수 있어요. 로그아웃했다가 다시 로그인해 주세요.';
+  return '원인: ' + m.slice(0, 140);
+}
+
 // ===== 시험 회차 공통 (필기 / 실기) =====
 const EXAM_KINDS = ['필기', '실기'];
 function ymdToDate(str) { const [y, m, d] = String(str).slice(0, 10).split('-').map(Number); return new Date(y, (m || 1) - 1, d || 1); }

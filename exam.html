@@ -113,8 +113,12 @@ button.cal-cell:hover{border-color:var(--accent);}
 .ti-opts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.4rem;align-items:center;}
 .ti-opts .mini{justify-self:end;}
 .tsubj{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.5rem;}
-.tsubj .chip{gap:.3rem;padding:3px 4px 3px 10px;}
-.tsubj .chip button{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border:none;background:none;border-radius:50%;color:var(--text-muted);cursor:pointer;font-size:.9rem;}
+.tsubj .chip{gap:.1rem;min-height:40px;padding:0 2px 0 12px;font-size:.78rem;}
+.tsubj .chip-edit{display:inline-flex;align-items:center;gap:.2rem;}
+.tsubj .chip-edit input{margin:0;width:9rem;min-height:40px;padding:.2rem .6rem;}
+#ask-msg{white-space:pre-line;font-size:.88rem;line-height:1.65;color:var(--text);margin:0 0 1rem;}
+.tsubj .chip button{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border:none;background:none;border-radius:50%;color:var(--text-muted);cursor:pointer;font-size:.9rem;}
+.tsubj .chip button:hover{background:var(--surface);color:var(--text);}
 </style>
 </head>
 <body>
@@ -227,18 +231,47 @@ button.cal-cell:hover{border-color:var(--accent);}
   </div>
 </div>
 
+<div class="sheet-overlay center-md" id="ask-overlay" onclick="if(event.target===this)askClose(false)">
+  <div class="sheet" role="alertdialog" aria-modal="true" aria-labelledby="ask-title" aria-describedby="ask-msg">
+    <div class="sheet-handle"></div>
+    <h2 id="ask-title" style="font-size:1.05rem;margin:.3rem 0 .6rem"></h2>
+    <p id="ask-msg"></p>
+    <div class="qa-actions" style="margin-top:0">
+      <button type="button" class="btn btn-outline" id="ask-no" onclick="askClose(false)">취소</button>
+      <button type="button" class="btn btn-danger" id="ask-ok" onclick="askClose(true)">확인</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const TPL_NAME = '회차 기본';
 const LINKS = [['', '없음'], ['delivery.html', '택배 발송'], ['delivery.html?tab=venues', '시험장 관리'], ['index.html', '자료실'], ['upload.html', '업로드'], ['todo.html', '할일']];
 let rounds = [], items = [], tpl = { id: null, subjects: [], items: [] };
-let tab = 'active', openId = null, editingItem = null, loadError = false;
+let tab = 'active', openId = null, editingItem = null, loadError = false, loadErrMsg = '';
 let calMonth = new Date(); calMonth.setDate(1); calMonth.setHours(0, 0, 0, 0);
-let tplDraft = null, tplOrigIds = [];
+let tplDraft = null, tplOrigIds = [], tplSubjEdit = null;
 
 window.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.sheet-close').forEach(c => { c.innerHTML = svgIcon('close', 18); });
   initPage(() => { loadAll(); });
 });
+
+// ---------- 확인창 ----------
+// 브라우저 기본 confirm() 은 '이 페이지에서 대화상자 더 안 보기'를 누르면 말없이 취소로 처리돼서, 앱 안의 창을 사용
+let _askResolve = null;
+function askConfirm(title, msg, opt) {
+  opt = opt || {};
+  return new Promise(res => {
+    if (_askResolve) _askResolve(false);
+    _askResolve = res;
+    document.getElementById('ask-title').textContent = title;
+    document.getElementById('ask-msg').textContent = msg;
+    const ok = document.getElementById('ask-ok'); ok.textContent = opt.ok || '확인'; ok.className = 'btn ' + (opt.danger === false ? 'btn-primary' : 'btn-danger');
+    document.getElementById('ask-no').textContent = opt.cancel || '취소';
+    overlayOpen(document.getElementById('ask-overlay'), document.getElementById('ask-no'), () => askClose(false));
+  });
+}
+function askClose(v) { const r = _askResolve; _askResolve = null; overlayClose(document.getElementById('ask-overlay')); if (r) r(v); }
 
 // ---------- 도우미 ----------
 const esc = escHtml;
@@ -277,14 +310,15 @@ async function loadAll() {
   const [r, i, t] = await Promise.all([
     sb.from('exam_schedules').select('*').eq('user_id', uid).order('exam_date', { ascending: true }),
     sb.from('exam_items').select('*').eq('user_id', uid).order('sort_order', { ascending: true }),
-    sb.from('checklist_templates').select('*').eq('user_id', uid).eq('name', TPL_NAME).maybeSingle()
+    sb.from('checklist_templates').select('*').eq('user_id', uid).eq('name', TPL_NAME).order('created_at', { ascending: true })
   ]);
-  loadError = !!(r.error || i.error);
+  loadError = !!(r.error || i.error); loadErrMsg = loadError ? sqlHint(r.error || i.error) : '';
   rounds = r.data || []; items = i.data || [];
   tpl = { id: null, subjects: [], items: [] };
-  if (t && t.data) {
-    tpl.id = t.data.id; tpl.subjects = Array.isArray(t.data.subjects) ? t.data.subjects.slice() : [];
-    const ti = await sb.from('checklist_template_items').select('*').eq('template_id', t.data.id).order('sort_order', { ascending: true });
+  const tRow = t && Array.isArray(t.data) ? t.data[0] : null;
+  if (tRow) {
+    tpl.id = tRow.id; tpl.subjects = Array.isArray(tRow.subjects) ? tRow.subjects.slice() : [];
+    const ti = await sb.from('checklist_template_items').select('*').eq('template_id', tRow.id).order('sort_order', { ascending: true });
     tpl.items = ti.data || [];
   }
   const want = new URLSearchParams(location.search).get('open');                // 대시보드에서 회차를 눌러 들어온 경우
@@ -297,7 +331,7 @@ async function loadAll() {
 
 // ---------- 화면 ----------
 function renderAll() {
-  document.getElementById('exam-warn').innerHTML = loadError ? '<div class="exam-warn">시험 회차 저장 공간을 불러오지 못했어요. Supabase에서 <b>07번 SQL</b>을 실행했는지 확인해 주세요.</div>' : '';
+  document.getElementById('exam-warn').innerHTML = loadError ? `<div class="exam-warn" role="alert"><b>시험 회차 저장 공간을 불러오지 못했어요.</b><br>${escHtml(loadErrMsg || 'Supabase에서 07번 SQL을 실행했는지 확인해 주세요.')}</div>` : '';
   document.getElementById('n-active').textContent = roundsOf('active').length ? `(${roundsOf('active').length})` : '';
   document.getElementById('n-done').textContent = roundsOf('done').length ? `(${roundsOf('done').length})` : '';
   document.getElementById('tab-active').classList.toggle('active', tab === 'active'); document.getElementById('tab-active').setAttribute('aria-selected', tab === 'active');
@@ -307,6 +341,7 @@ function renderAll() {
 function setTab(t) { tab = t; renderAll(); }
 function renderRounds() {
   const el = document.getElementById('round-list');
+  if (loadError) { el.innerHTML = '<div class="card exam-empty">위 안내대로 준비한 뒤 새로고침해 주세요.</div>'; return; }
   const list = roundsOf(tab);
   if (!list.length) {
     el.innerHTML = tab === 'active'
@@ -395,7 +430,7 @@ async function saveItemEdit(id) {
 }
 async function deleteItem(id) {
   const it = items.find(i => i.id === id); if (!it) return;
-  if (!confirm(`'${it.text}' 항목을 삭제할까요?`)) return;
+  if (!(await askConfirm('항목 삭제', `'${it.text}' 항목을 삭제할까요?`, { ok: '삭제' }))) return;
   const { error } = await sb.from('exam_items').delete().eq('id', id);
   if (error) { showToast('⚠️ 삭제하지 못했어요'); return; }
   items = items.filter(i => i.id !== id); rerenderRound(it.exam_id);
@@ -424,7 +459,7 @@ async function setRoundStatus(id, status) {
 }
 async function deleteRound(id) {
   const r = rounds.find(x => x.id === id); if (!r) return;
-  if (!confirm(`'${r.title}' 회차와 체크리스트를 모두 삭제할까요?`)) return;
+  if (!(await askConfirm('회차 삭제', `'${r.title}' 회차와 체크리스트를 모두 삭제할까요?`, { ok: '삭제' }))) return;
   const { error } = await sb.from('exam_schedules').delete().eq('id', id);
   if (error) { showToast('⚠️ 삭제하지 못했어요'); return; }
   rounds = rounds.filter(x => x.id !== id); items = items.filter(i => i.exam_id !== id);
@@ -539,19 +574,19 @@ async function saveRound() {
     const patch = { title, exam_date, exam_type, subjects, kinds, kind_dates };
     const { error } = await sb.from('exam_schedules').update(patch).eq('id', id);
     btn.disabled = false;
-    if (error) return fail('저장하지 못했어요. 잠시 후 다시 시도해 주세요');
+    if (error) return fail('저장하지 못했어요. ' + (sqlHint(error) || '잠시 후 다시 시도해 주세요'));
     Object.assign(rounds.find(x => x.id === id), patch);
     closeRoundModal(); renderAll(); showToast('✅ 저장했어요'); return;
   }
   const { data: round, error } = await sb.from('exam_schedules').insert({ user_id: currentUser.id, title, exam_date, exam_type, subjects, kinds, kind_dates, status: 'active' }).select().single();
-  if (error || !round) { btn.disabled = false; return fail('회차를 만들지 못했어요. 잠시 후 다시 시도해 주세요'); }
+  if (error || !round) { btn.disabled = false; return fail('회차를 만들지 못했어요. ' + (sqlHint(error) || '잠시 후 다시 시도해 주세요')); }
   const rows = rmItemsFor(subjects, kinds).map((t, k) => ({ exam_id: round.id, user_id: currentUser.id, group_name: t.group_name || '', text: t.text, subject: t.subject || null, kind: t.kind || null, link: t.link || null, done: false, sort_order: (k + 1) * 10 }));
   let made = [];
   if (rows.length) {
     const res = await sb.from('exam_items').insert(rows).select();
     if (res.error) {                                                                    // 체크리스트 생성에 실패하면 회차도 취소 (반쪽짜리 회차를 남기지 않음)
       await sb.from('exam_schedules').delete().eq('id', round.id);
-      btn.disabled = false; return fail('체크리스트를 만들지 못해서 회차 생성을 취소했어요. 다시 시도해 주세요');
+      btn.disabled = false; return fail('체크리스트를 만들지 못해서 회차 생성을 취소했어요. ' + (sqlHint(res.error) || '다시 시도해 주세요'));
     }
     made = res.data || [];
   }
@@ -566,6 +601,7 @@ async function saveRound() {
 function tplBuildDraft() {
   const groups = groupItems(tpl.items.map(i => ({ ...i, exam_id: 'tpl' })));
   tplDraft = { subjects: tpl.subjects.slice(), groups: groups.map(g => ({ name: g.name === '기타' ? '' : g.name, items: g.items.map(i => ({ id: i.id, text: i.text, subject: i.subject || '', kind: i.kind || '', link: i.link || '' })) })) };
+  tplDraft.orig = tpl.subjects.slice(); tplDraft.renames = {}; tplSubjEdit = null;
   tplOrigIds = tpl.items.map(i => i.id);
 }
 function openTplEditor() {
@@ -578,7 +614,9 @@ function openTplEditor() {
 function closeTplEditor() { overlayClose(document.getElementById('tpl-overlay')); }
 function tplRender(focusSel) {
   document.getElementById('tpl-subjects').innerHTML = tplDraft.subjects.length
-    ? tplDraft.subjects.map((s, i) => `<span class="chip chip-muted">${esc(s)}<button type="button" onclick="tplRemoveSubject(${i})" aria-label="${esc(s)} 과목 삭제">✕</button></span>`).join('')
+    ? tplDraft.subjects.map((s, i) => tplSubjEdit === i
+        ? `<span class="chip-edit"><input type="text" id="tpl-subj-edit" value="${esc(s)}" maxlength="20" aria-label="${esc(s)} 새 이름" onkeydown="tplRenameKey(event,${i})"><button type="button" class="mini" onclick="tplApplyRename(${i})" aria-label="이름 바꾸기 확인">✓</button><button type="button" class="mini" onclick="tplCancelRename()" aria-label="이름 바꾸기 취소">✕</button></span>`
+        : `<span class="chip chip-muted">${esc(s)}<button type="button" onclick="tplStartRename(${i})" aria-label="${esc(s)} 이름 바꾸기">✏️</button><button type="button" onclick="tplRemoveSubject(${i})" aria-label="${esc(s)} 과목 삭제">✕</button></span>`).join('')
     : '<span class="rm-subjects-empty">아직 과목 코드가 없어요</span>';
   const subjOpts = sel => `<option value="">모든 회차</option>` + tplDraft.subjects.map(s => `<option value="${esc(s)}"${s === sel ? ' selected' : ''}>${esc(s)}만</option>`).join('') + (sel && !tplDraft.subjects.includes(sel) ? `<option value="${esc(sel)}" selected>${esc(sel)}만</option>` : '');
   const kindOpts = sel => [['', '둘 다'], ['필기', '필기만'], ['실기', '실기만']].map(([v, l]) => `<option value="${v}"${v === sel ? ' selected' : ''}>${l}</option>`).join('');
@@ -612,14 +650,60 @@ function tplAddSubject() {
   if (!tplDraft.subjects.includes(v)) tplDraft.subjects.push(v);
   inp.value = ''; tplRender('#tpl-subj-input');
 }
-function tplRemoveSubject(i) {
-  const s = tplDraft.subjects[i], used = tplDraft.groups.reduce((n, g) => n + g.items.filter(it => it.subject === s).length, 0);
-  if (used && !confirm(`'${s}' 과목을 쓰는 항목 ${used}개는 '모든 회차' 항목으로 바뀌어요. 삭제할까요?`)) return;
-  tplDraft.groups.forEach(g => g.items.forEach(it => { if (it.subject === s) it.subject = ''; }));
-  tplDraft.subjects.splice(i, 1); tplRender('#tpl-subj-input');
+async function tplRemoveSubject(i) {
+  const sub = tplDraft.subjects[i], used = tplDraft.groups.reduce((n, g) => n + g.items.filter(it => it.subject === sub).length, 0);
+  if (used && !(await askConfirm('과목 삭제', `'${sub}' 과목 코드를 삭제할까요?\n이 과목을 쓰는 항목 ${used}개는 '모든 회차' 항목으로 바뀌어요.\n(이름만 바꾸려면 취소하고 ✏️를 눌러 주세요)`, { ok: '삭제' }))) return;      // 안 쓰는 과목은 바로 삭제
+  tplDraft.groups.forEach(g => g.items.forEach(it => { if (it.subject === sub) it.subject = ''; }));
+  tplDraft.subjects.splice(i, 1);
+  for (const k of Object.keys(tplDraft.renames)) if (tplDraft.renames[k] === sub) delete tplDraft.renames[k];
+  tplSubjEdit = null; tplRender('#tpl-subj-input');
+}
+function tplStartRename(i) { tplSubjEdit = i; tplRender('#tpl-subj-edit'); const e = document.getElementById('tpl-subj-edit'); if (e) e.select(); }
+function tplCancelRename() { const i = tplSubjEdit; tplSubjEdit = null; tplRender(); const b = document.querySelectorAll('#tpl-subjects .chip')[i]; if (b) b.querySelector('button').focus({ preventScroll: true }); }
+function tplRenameKey(e, i) {
+  if (e.isComposing || e.keyCode === 229) return;
+  if (e.key === 'Enter') { e.preventDefault(); tplApplyRename(i); }
+  else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); tplCancelRename(); }
+}
+function tplApplyRename(i) {
+  const err = document.getElementById('tpl-err'), inp = document.getElementById('tpl-subj-edit');
+  const old = tplDraft.subjects[i], nw = (inp ? inp.value : '').trim().replace(/\s+/g, ' ');
+  const bad = m => { err.textContent = m; err.classList.add('show'); if (inp) inp.focus(); };
+  err.classList.remove('show');
+  if (!nw) return bad('과목 코드를 입력해 주세요');
+  if (nw === old) return tplCancelRename();
+  if (tplDraft.subjects.some((s, j) => j !== i && s === nw)) return bad(`'${nw}' 는 이미 있는 과목 코드예요`);
+  tplDraft.subjects[i] = nw;
+  tplDraft.groups.forEach(g => g.items.forEach(it => { if (it.subject === old) it.subject = nw; }));     // 이 과목을 쓰던 템플릿 항목도 새 이름으로
+  let key = Object.keys(tplDraft.renames).find(k => tplDraft.renames[k] === old);                           // 이미 만든 회차까지 바꿀 때 쓸 '원래 이름 → 새 이름' 기록
+  if (key === undefined && tplDraft.orig.includes(old)) key = old;
+  if (key !== undefined) tplDraft.renames[key] = nw;
+  tplSubjEdit = null; tplRender();
+  const b = document.querySelectorAll('#tpl-subjects .chip')[i]; if (b) b.querySelector('button').focus({ preventScroll: true });
+}
+async function applyRenames(map) {                                                                              // 템플릿 저장 뒤: 이미 만든 회차의 과목 표시도 함께 바꿀지 물어봄
+  const pairs = Object.entries(map).filter(([k, v]) => k !== v);
+  for (const [from, to] of pairs) {
+    const rs = rounds.filter(r => (r.subjects || []).includes(from)), its = items.filter(i => i.subject === from);
+    if (!rs.length && !its.length) continue;
+    const yes = await askConfirm('이미 만든 회차도 바꿀까요?', `'${from}' → '${to}'\n회차 ${rs.length}개, 체크리스트 항목 ${its.length}개의 과목 표시도 함께 바꿔요.\n(그대로 두어도 새로 만드는 회차에는 영향이 없어요)`, { ok: '함께 바꾸기', cancel: '그대로 두기', danger: false });
+    if (!yes) continue;
+    let failed = false;
+    for (const r of rs) {
+      const subjects = [...new Set(r.subjects.map(x => x === from ? to : x))];
+      const { error } = await sb.from('exam_schedules').update({ subjects }).eq('id', r.id);
+      if (error) { failed = true; console.error('[과목 이름 바꾸기]', error); } else r.subjects = subjects;
+    }
+    if (its.length) {
+      const { error } = await sb.from('exam_items').update({ subject: to }).eq('subject', from).eq('user_id', currentUser.id);
+      if (error) { failed = true; console.error('[과목 이름 바꾸기]', error); } else its.forEach(i => { i.subject = to; });
+    }
+    showToast(failed ? '⚠️ 일부는 바꾸지 못했어요' : `✅ 이미 만든 회차의 '${from}'도 '${to}'로 바꿨어요`);
+  }
+  renderAll();
 }
 function tplAddGroup() { tplDraft.groups.push({ name: '', items: [{ id: null, text: '', subject: '', kind: '', link: '' }] }); const gi = tplDraft.groups.length - 1; tplRender(`#tg-${gi}`); document.getElementById('tg-' + gi).scrollIntoView({ block: 'center' }); }
-function tplDeleteGroup(gi) { const g = tplDraft.groups[gi]; if (g.items.length && !confirm(`'${g.name || '기타'}' 그룹과 항목 ${g.items.length}개를 삭제할까요?`)) return; tplDraft.groups.splice(gi, 1); tplRender(); }
+async function tplDeleteGroup(gi) { const g = tplDraft.groups[gi]; if (g.items.length && !(await askConfirm('그룹 삭제', `'${g.name || '기타'}' 그룹과 항목 ${g.items.length}개를 삭제할까요?`, { ok: '삭제' }))) return; tplDraft.groups.splice(gi, 1); tplRender(); }
 function tplMoveGroup(gi, d) { const j = gi + d; if (j < 0 || j >= tplDraft.groups.length) return; [tplDraft.groups[gi], tplDraft.groups[j]] = [tplDraft.groups[j], tplDraft.groups[gi]]; tplRender(`#tg-${j}`); }
 function tplAddItem(gi) { tplDraft.groups[gi].items.push({ id: null, text: '', subject: '', kind: '', link: '' }); tplRender(`#ti-${gi}-${tplDraft.groups[gi].items.length - 1}`); }
 function tplDeleteItem(gi, ii) { tplDraft.groups[gi].items.splice(ii, 1); tplRender(); }
@@ -633,28 +717,29 @@ async function saveTemplate() {
   }
   btn.disabled = true;
   const subjects = tplDraft.subjects;
+  const stop = (what, error) => { btn.disabled = false; console.error('[템플릿 저장 실패]', what, error); return fail(`${what} 중에 저장하지 못했어요. ` + (sqlHint(error) || '다시 한 번 저장해 주세요')); };
   let tid = tpl.id;
   if (!tid) {
     const { data, error } = await sb.from('checklist_templates').insert({ user_id: currentUser.id, name: TPL_NAME, description: '시험 회차를 만들 때 자동으로 만들어지는 준비 체크리스트', subjects }).select().single();
-    if (error || !data) { btn.disabled = false; return fail('저장하지 못했어요. 07번 SQL을 실행했는지 확인해 주세요'); }
-    tid = data.id;
+    if (error || !data) return stop('템플릿 만들기', error);
+    tid = data.id; tpl.id = tid;                                                        // 저장이 중간에 실패해도 다시 눌렀을 때 템플릿이 또 생기지 않게 바로 기억
   } else {
     const { error } = await sb.from('checklist_templates').update({ subjects }).eq('id', tid);
-    if (error) { btn.disabled = false; return fail('저장하지 못했어요. 잠시 후 다시 시도해 주세요'); }
+    if (error) return stop('과목 코드 저장', error);
   }
+  // 새 항목에는 미리 id 를 만들어 두면 '기존 수정 + 새로 추가'를 한 번의 요청(전부 성공 또는 전부 실패)으로 보낼 수 있음
+  const newId = () => (window.crypto && crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); }));
   const rows = []; let ord = 10;
-  tplDraft.groups.forEach(g => g.items.forEach(it => { rows.push({ id: it.id, template_id: tid, group_name: g.name.trim(), text: it.text.trim(), subject: it.subject || null, kind: it.kind || null, link: it.link || null, sort_order: ord }); ord += 10; }));
-  const keep = new Set(rows.filter(r => r.id).map(r => r.id)), removed = tplOrigIds.filter(id => !keep.has(id));
-  let ok = true;
-  if (removed.length) ok = !(await sb.from('checklist_template_items').delete().in('id', removed)).error;
-  const existing = rows.filter(r => r.id), fresh = rows.filter(r => !r.id).map(({ id, ...rest }) => rest);
-  if (ok && existing.length) ok = !(await sb.from('checklist_template_items').upsert(existing)).error;
-  if (ok && fresh.length) ok = !(await sb.from('checklist_template_items').insert(fresh)).error;
+  tplDraft.groups.forEach(g => g.items.forEach(it => { rows.push({ id: it.id || newId(), template_id: tid, group_name: g.name.trim(), text: it.text.trim(), subject: it.subject || null, kind: it.kind || null, link: it.link || null, sort_order: ord }); ord += 10; }));
+  const keep = new Set(rows.map(r => r.id)), removed = tplOrigIds.filter(id => !keep.has(id));
+  if (removed.length) { const d = await sb.from('checklist_template_items').delete().in('id', removed); if (d.error) return stop('지운 항목 정리', d.error); }
+  if (rows.length) { const u = await sb.from('checklist_template_items').upsert(rows); if (u.error) return stop('항목 저장', u.error); }
   btn.disabled = false;
-  if (!ok) return fail('일부만 저장됐을 수 있어요. 다시 한 번 저장해 주세요');
   const ti = await sb.from('checklist_template_items').select('*').eq('template_id', tid).order('sort_order', { ascending: true });
   tpl = { id: tid, subjects: subjects.slice(), items: ti.data || [] };
+  const renames = Object.assign({}, tplDraft.renames);
   closeTplEditor(); showToast('✅ 템플릿을 저장했어요');
+  await applyRenames(renames);
 }
 </script>
 </body>

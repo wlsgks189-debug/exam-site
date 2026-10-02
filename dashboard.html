@@ -547,7 +547,7 @@ async function loadExams() {
         <div class="em-prog"><div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div><span>${c.d}/${c.t}</span></div>
       </a>`;
     }).join('');
-  } catch (e) { el.innerHTML = '<div class="rule-empty">시험 회차를 불러오지 못했어요. (07번 SQL을 실행했는지 확인해 주세요)</div>'; }
+  } catch (e) { el.innerHTML = `<div class="rule-empty">시험 회차를 불러오지 못했어요.<br>${escHtml(sqlHint(e) || '07번 SQL을 실행했는지 확인해 주세요.')}</div>`; }
 }
 
 // ---------- 나의 기준 (비공개 메모: pinned_notes 테이블) ----------
