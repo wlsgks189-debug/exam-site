@@ -18,6 +18,33 @@
 .venue-name{font-size:.9rem;font-weight:600;}
 .venue-addr{font-size:.72rem;color:var(--text-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .venue-actions{display:flex;gap:.35rem;flex-shrink:0;}
+/* 시험장 관리: 검색 · 지역 칩 · 정렬 · 접는 입력 폼 */
+.venue-form-head{display:flex;justify-content:space-between;align-items:center;gap:.6rem;}
+.venue-form-head h2{margin:0;}
+#venue-form-body{margin-top:1rem;}
+.venue-tools{margin-bottom:1rem;}
+.venue-tools input[type="search"]{margin:0;}
+.venue-chips{display:flex;flex-wrap:wrap;gap:.4rem;margin:.7rem 0;}
+.vchip{display:inline-flex;align-items:center;gap:.35rem;min-height:36px;padding:0 .8rem;border-radius:18px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-family:inherit;font-size:.8rem;cursor:pointer;white-space:nowrap;flex-shrink:0;}
+.vchip:hover{border-color:var(--accent);}
+.vchip b{font-weight:600;}
+.vchip.active{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);font-weight:700;}
+.venue-toolbar{display:flex;justify-content:space-between;align-items:center;gap:.6rem;font-size:.8rem;color:var(--text-muted);}
+.venue-toolbar select{width:auto;max-width:55%;padding:.3rem .6rem;font-size:.8rem;}
+.venue-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:.6rem;}
+@media(min-width:900px){.venue-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+.venue-grid .venue-item{margin-bottom:0;}
+.venue-grid .venue-addr{white-space:normal;overflow:visible;line-height:1.5;}
+.venue-group{grid-column:1/-1;display:flex;align-items:baseline;gap:.5rem;margin-top:.5rem;font-size:.82rem;font-weight:700;color:var(--accent);}
+.venue-group span{font-weight:400;color:var(--text-muted);}
+.venue-region{display:inline-block;margin-left:.4rem;padding:1px 7px;border-radius:10px;font-size:.72rem;font-weight:600;background:var(--surface);border:1px solid var(--border);color:var(--text-muted);vertical-align:middle;}
+.venue-meta{font-size:.76rem;color:var(--text-muted);margin-top:3px;}
+.venue-meta a{color:var(--accent);text-decoration:none;}
+@media(pointer:coarse){.venue-meta a{display:inline-block;padding:.85rem .35rem;margin:-.85rem -.35rem;}}   /* 폰: 전화번호를 눌러 바로 전화 — 모양은 그대로, 누르는 영역만 넓힘 */
+.venue-item mark{background:color-mix(in srgb,var(--warning) 35%,transparent);color:inherit;border-radius:3px;padding:0 1px;}
+.venue-more{display:flex;justify-content:center;margin-top:1rem;}
+.venue-more .btn{width:auto;margin:0;}
+@media(max-width:600px){.venue-chips{flex-wrap:nowrap;overflow-x:auto;padding-bottom:.3rem;-webkit-overflow-scrolling:touch;}}
 .venue-check{width:18px;height:18px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;}
 .qty-input{width:52px;padding:.25rem .4rem;font-size:.82rem;text-align:center;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);}
 .qty-input:focus{outline:none;border-color:var(--accent);}
@@ -96,22 +123,43 @@
 
     <!-- 시험장 관리 -->
     <div id="dtab-venues" style="display:none">
-      <div class="card">
-        <h2 id="venue-form-title">시험장 추가</h2>
-        <input type="hidden" id="venue-edit-id">
-        <div class="form-row" style="flex-wrap:wrap">
-          <div class="form-group" style="flex:2;min-width:200px"><label>기관명</label><input type="text" id="venue-name" placeholder="예: 선린인터넷고등학교(1)"></div>
-          <div class="form-group" style="flex:1;min-width:120px"><label>우편번호</label><input type="text" id="venue-zipcode" placeholder="예: 04314"></div>
+      <div class="card" id="venue-form-card">
+        <div class="venue-form-head">
+          <h2 id="venue-form-title">시험장 추가</h2>
+          <button type="button" class="btn btn-outline btn-sm" id="venue-form-toggle" aria-expanded="false" aria-controls="venue-form-body" onclick="toggleVenueForm()">+ 추가</button>
         </div>
-        <div class="form-group"><label>주소</label><input type="text" id="venue-address" placeholder="전체 주소 입력"></div>
-        <div class="form-row" style="flex-wrap:wrap">
-          <div class="form-group" style="min-width:calc(50% - .3rem)"><label>담당자</label><input type="text" id="venue-manager" placeholder="담당자명"></div>
-          <div class="form-group" style="min-width:calc(50% - .3rem)"><label>연락처</label><input type="text" id="venue-phone" placeholder="010-0000-0000"></div>
+        <div id="venue-form-body" hidden>
+          <input type="hidden" id="venue-edit-id">
+          <div class="form-row" style="flex-wrap:wrap">
+            <div class="form-group" style="flex:2;min-width:200px"><label for="venue-name">기관명</label><input type="text" id="venue-name" placeholder="예: 선린인터넷고등학교(1)"></div>
+            <div class="form-group" style="flex:1;min-width:120px"><label for="venue-zipcode">우편번호</label><input type="text" id="venue-zipcode" placeholder="예: 04314"></div>
+          </div>
+          <div class="form-group"><label for="venue-address">주소</label><input type="text" id="venue-address" placeholder="전체 주소 입력"></div>
+          <div class="form-row" style="flex-wrap:wrap">
+            <div class="form-group" style="min-width:calc(50% - .3rem)"><label for="venue-manager">담당자</label><input type="text" id="venue-manager" placeholder="담당자명"></div>
+            <div class="form-group" style="min-width:calc(50% - .3rem)"><label for="venue-phone">연락처</label><input type="text" id="venue-phone" placeholder="010-0000-0000"></div>
+          </div>
+          <div class="form-group"><label for="venue-note">비고</label><input type="text" id="venue-note" placeholder="특이사항"></div>
+          <button class="btn btn-primary" onclick="saveVenue()">저장</button>
         </div>
-        <div class="form-group"><label>비고</label><input type="text" id="venue-note" placeholder="특이사항"></div>
-        <button class="btn btn-primary" onclick="saveVenue()">저장</button>
       </div>
-      <div id="venue-list"><div class="empty">시험장이 없습니다</div></div>
+
+      <div class="card venue-tools">
+        <label for="venue-search" class="sr-only">시험장 검색</label>
+        <input type="search" id="venue-search" placeholder="🔍 기관명 · 주소 · 담당자 · 연락처 (여러 단어는 모두 맞는 것만)" enterkeyhint="search" autocomplete="off" oninput="onVenueSearch()">
+        <div class="venue-chips" id="venue-regions" role="group" aria-label="지역별로 보기"></div>
+        <div class="venue-toolbar">
+          <span id="venue-count" role="status" aria-live="polite"></span>
+          <label for="venue-sort" class="sr-only">정렬</label>
+          <select id="venue-sort" onchange="onVenueSort()">
+            <option value="name">가나다순</option>
+            <option value="region">지역별로 묶기</option>
+            <option value="recent">최근 등록순</option>
+          </select>
+        </div>
+      </div>
+      <div id="venue-list" class="venue-grid"><div class="empty">시험장이 없습니다</div></div>
+      <div class="venue-more" id="venue-more"></div>
     </div>
 
     <!-- 발송 이력 -->
@@ -130,6 +178,10 @@ window.addEventListener('DOMContentLoaded', () => {
   initPage(() => {
     loadVenues();
     loadFolders();
+    const sortEl = document.getElementById('venue-sort'), saved = lsGet('icqa_venue_sort');
+    if (saved && [...sortEl.options].some(o => o.value === saved)) sortEl.value = saved;
+    const sp = new URLSearchParams(location.search);                 // 검색창(Ctrl K)에서 시험장을 고르면 이 주소로 옴
+    if (sp.get('tab') === 'venues') { document.getElementById('venue-search').value = (sp.get('q') || '').slice(0, 100); switchDelivTab('venues'); }
   });
 });
 
@@ -267,16 +319,16 @@ function renderFolderVenueSearch() {
   if (!venues.length) { el.innerHTML = '<div class="empty">등록된 시험장이 없습니다. 시험장 관리 탭에서 먼저 추가해주세요</div>'; return; }
   const addedKeys = new Set(folderDraftVenues.map(v => v.name + '|' + (v.address||'')));
   let list = venues;
-  if (q) list = list.filter(v => (v.name||'').toLowerCase().includes(q) || (v.address||'').toLowerCase().includes(q));
+  if (q) { const terms = q.split(/\s+/).filter(Boolean); list = list.filter(v => venueMatches(v, terms)); }
   if (!list.length) { el.innerHTML = '<div class="empty">검색 결과가 없습니다</div>'; return; }
   el.innerHTML = list.slice(0, 50).map(v => {
     const already = addedKeys.has(v.name + '|' + (v.address||''));
     return `<div class="venue-item" style="padding:.6rem .8rem">
       <div class="venue-info">
-        <div class="venue-name" style="font-size:.84rem">${v.name}</div>
-        <div class="venue-addr">${v.address || ''}</div>
+        <div class="venue-name" style="font-size:.84rem">${escHtml(v.name)}</div>
+        <div class="venue-addr">${escHtml(v.address || '')}</div>
       </div>
-      <button class="btn ${already ? 'btn-outline' : 'btn-success'} btn-sm" ${already ? 'disabled' : ''} onclick="addVenueToFolder('${v.id}')">${already ? '✓ 담김' : '+ 담기'}</button>
+      <button class="btn ${already ? 'btn-outline' : 'btn-success'} btn-sm" ${already ? 'disabled' : ''} onclick="addVenueToFolder('${escHtml(v.id)}')">${already ? '✓ 담김' : '+ 담기'}</button>
     </div>`;
   }).join('');
 }
@@ -300,8 +352,8 @@ function renderFolderVenueList() {
   el.innerHTML = folderDraftVenues.map(v => `
     <div class="venue-item" style="padding:.6rem .8rem">
       <div class="venue-info">
-        <div class="venue-name" style="font-size:.84rem">${v.name}</div>
-        <div class="venue-addr">${v.address || ''}</div>
+        <div class="venue-name" style="font-size:.84rem">${escHtml(v.name)}</div>
+        <div class="venue-addr">${escHtml(v.address || '')}</div>
       </div>
       <div style="display:flex;align-items:center;gap:.4rem;flex-shrink:0">
         <span style="font-size:.72rem;color:var(--text-muted)">수량</span>
@@ -415,23 +467,104 @@ async function exportFolderExcelById(id) {
   showToast('✅ 엑셀 파일이 다운로드됐어요!');
 }
 
+// ---------- 시험장 관리: 검색 / 지역 / 정렬 / 더 보기 ----------
+const VENUE_PAGE = 30;
+const REGION_ORDER = ['서울', '경기', '인천', '부산', '대구', '광주', '대전', '울산', '세종', '강원', '충북', '충남', '전북', '전남', '경북', '경남', '제주', '기타'];
+const REGION_PREFIX = [['충청북', '충북'], ['충청남', '충남'], ['전라북', '전북'], ['전라남', '전남'], ['경상북', '경북'], ['경상남', '경남'],
+  ['서울', '서울'], ['경기', '경기'], ['인천', '인천'], ['부산', '부산'], ['대구', '대구'], ['광주', '광주'], ['대전', '대전'], ['울산', '울산'],
+  ['세종', '세종'], ['강원', '강원'], ['충북', '충북'], ['충남', '충남'], ['전북', '전북'], ['전남', '전남'], ['경북', '경북'], ['경남', '경남'], ['제주', '제주']];
+const vs = { region: '', shown: VENUE_PAGE };
+
+function venueRegion(v) {                                    // 주소 맨 앞 글자로 시·도를 판별 (예: 서울특별시 → 서울)
+  const a = String(v.address || '').trim().replace(/^[\[(]?\d{5}[\])]?\s*/, '');
+  for (const [k, r] of REGION_PREFIX) if (a.startsWith(k)) return r;
+  return '기타';
+}
+function venueTerms() { return (document.getElementById('venue-search').value || '').trim().toLowerCase().split(/\s+/).filter(Boolean); }
+function venueMatches(v, terms) {                            // 모든 단어가 (이름·주소·우편번호·담당자·연락처·비고) 중 어딘가에 있어야 함
+  if (!terms.length) return true;
+  const hay = [v.name, v.address, v.zipcode, v.manager, v.phone, v.note].map(x => String(x || '').toLowerCase()).join(' ');
+  const digits = String(v.phone || '').replace(/\D/g, '');
+  return terms.every(t => hay.includes(t) || (/^\d{3,}$/.test(t) && digits.includes(t)));
+}
+function hlMulti(text, terms) {                              // 찾는 단어를 노란 표시 (글자는 항상 이스케이프)
+  text = String(text == null ? '' : text);
+  if (!terms.length) return escHtml(text);
+  const re = new RegExp('(' + terms.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')', 'gi');
+  let out = '', last = 0, m;
+  while ((m = re.exec(text)) !== null) {
+    if (m[0] === '') { re.lastIndex++; continue; }
+    out += escHtml(text.slice(last, m.index)) + '<mark>' + escHtml(m[0]) + '</mark>';
+    last = m.index + m[0].length;
+  }
+  return out + escHtml(text.slice(last));
+}
+function venueRowHtml(v, terms) {
+  const tel = String(v.phone || '').replace(/[^\d+]/g, '');
+  const meta = [v.manager ? escHtml(v.manager) : '', v.phone ? (tel ? `<a href="tel:${tel}">${hlMulti(v.phone, terms)}</a>` : hlMulti(v.phone, terms)) : '', v.note ? '📝 ' + hlMulti(v.note, terms) : ''].filter(Boolean).join(' · ');
+  return `<div class="venue-item" data-id="${escHtml(v.id)}">
+    <div class="venue-info">
+      <div class="venue-name">${hlMulti(v.name, terms)}<span class="venue-region">${escHtml(venueRegion(v))}</span></div>
+      <div class="venue-addr">${v.zipcode ? `[${hlMulti(v.zipcode, terms)}] ` : ''}${hlMulti(v.address || '', terms) || '<span style="opacity:.6">주소 없음</span>'}</div>
+      ${meta ? `<div class="venue-meta">${meta}</div>` : ''}
+    </div>
+    <div class="venue-actions">
+      <button class="btn btn-outline btn-sm" onclick="editVenue('${escHtml(v.id)}')" aria-label="${escHtml(v.name)} 수정">✏️</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteVenue('${escHtml(v.id)}')" aria-label="${escHtml(v.name)} 삭제">🗑</button>
+    </div>
+  </div>`;
+}
+function renderVenueList() {
+  const el = document.getElementById('venue-list'); if (!el) return;
+  const terms = venueTerms(), sort = document.getElementById('venue-sort').value;
+  const matched = venues.filter(v => venueMatches(v, terms));
+  // 지역 칩 (글자 검색 결과 기준 개수)
+  const counts = {}; matched.forEach(v => { const r = venueRegion(v); counts[r] = (counts[r] || 0) + 1; });
+  if (vs.region && !counts[vs.region]) counts[vs.region] = 0;
+  document.getElementById('venue-regions').innerHTML = (matched.length || vs.region ? [`<button type="button" class="vchip${vs.region ? '' : ' active'}" aria-pressed="${!vs.region}" onclick="setVenueRegion('')">전체 <b>${matched.length}</b></button>`]
+    .concat(REGION_ORDER.filter(r => counts[r] !== undefined).map(r => `<button type="button" class="vchip${vs.region === r ? ' active' : ''}" aria-pressed="${vs.region === r}" onclick="setVenueRegion('${r}')">${r} <b>${counts[r]}</b></button>`)).join('') : '');
+  let list = vs.region ? matched.filter(v => venueRegion(v) === vs.region) : matched;
+  const byName = (a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ko');
+  if (sort === 'recent') list = list.slice().sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')) || byName(a, b));
+  else if (sort === 'region') list = list.slice().sort((a, b) => REGION_ORDER.indexOf(venueRegion(a)) - REGION_ORDER.indexOf(venueRegion(b)) || byName(a, b));
+  else list = list.slice().sort(byName);
+  const filtered = terms.length > 0 || !!vs.region;
+  document.getElementById('venue-count').textContent = filtered ? `검색 결과 ${list.length}개 · 전체 ${venues.length}개` : `전체 ${venues.length}개`;
+  if (!venues.length) { el.innerHTML = '<div class="empty" style="grid-column:1/-1">시험장이 없습니다. 위의 <b>+ 추가</b>로 등록해 주세요</div>'; document.getElementById('venue-more').innerHTML = ''; return; }
+  if (!list.length) { el.innerHTML = `<div class="empty" style="grid-column:1/-1">찾는 시험장이 없어요<br><button type="button" class="btn btn-outline btn-sm" style="margin-top:.6rem" onclick="clearVenueFilter()">검색 지우기</button></div>`; document.getElementById('venue-more').innerHTML = ''; return; }
+  const shown = list.slice(0, vs.shown);
+  const groupCount = {}; if (sort === 'region') list.forEach(v => { const r = venueRegion(v); groupCount[r] = (groupCount[r] || 0) + 1; });
+  let html = '', prev = null;
+  shown.forEach(v => {
+    if (sort === 'region') { const r = venueRegion(v); if (r !== prev) { html += `<div class="venue-group">${escHtml(r)} <span>${groupCount[r]}개</span></div>`; prev = r; } }
+    html += venueRowHtml(v, terms);
+  });
+  el.innerHTML = html;
+  const rest = list.length - shown.length;
+  document.getElementById('venue-more').innerHTML = rest > 0 ? `<button type="button" class="btn btn-outline" onclick="moreVenues()">더 보기 (남은 ${rest}개)</button>` : '';
+}
+function onVenueSearch() { vs.shown = VENUE_PAGE; renderVenueList(); }
+function onVenueSort() { vs.shown = VENUE_PAGE; lsSet('icqa_venue_sort', document.getElementById('venue-sort').value); renderVenueList(); }
+function setVenueRegion(r) { vs.region = (vs.region === r) ? '' : r; vs.shown = VENUE_PAGE; renderVenueList(); }
+function moreVenues() { vs.shown += VENUE_PAGE; renderVenueList(); }
+function clearVenueFilter() { document.getElementById('venue-search').value = ''; vs.region = ''; vs.shown = VENUE_PAGE; renderVenueList(); document.getElementById('venue-search').focus(); }
+function toggleVenueForm(force) {
+  const body = document.getElementById('venue-form-body'), btn = document.getElementById('venue-form-toggle');
+  const open = typeof force === 'boolean' ? force : body.hidden;
+  body.hidden = !open;
+  btn.setAttribute('aria-expanded', String(open));
+  btn.textContent = open ? '접기' : '+ 추가';
+  if (open && !document.getElementById('venue-edit-id').value) document.getElementById('venue-name').focus({ preventScroll: true });
+}
+function resetVenueForm() {
+  ['venue-name', 'venue-address', 'venue-zipcode', 'venue-manager', 'venue-phone', 'venue-note', 'venue-edit-id'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('venue-form-title').textContent = '시험장 추가';
+}
+
 async function loadVenueList() {
   const { data } = await sb.from('exam_venues').select('*').eq('user_id', currentUser.id).order('name');
   venues = data || [];
-  const el = document.getElementById('venue-list');
-  if (!venues.length) { el.innerHTML = '<div class="empty">시험장이 없습니다</div>'; return; }
-  el.innerHTML = venues.map(v => `
-    <div class="venue-item">
-      <div class="venue-info">
-        <div class="venue-name">${v.name}</div>
-        <div class="venue-addr">${v.zipcode ? `[${v.zipcode}] ` : ''}${v.address || ''}</div>
-        <div style="font-size:.72rem;color:var(--text-muted);margin-top:2px">${v.manager || ''} ${v.phone || ''}</div>
-      </div>
-      <div class="venue-actions">
-        <button class="btn btn-outline btn-sm" onclick="editVenue('${v.id}')">✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteVenue('${v.id}')">🗑</button>
-      </div>
-    </div>`).join('');
+  renderVenueList();
 }
 
 async function saveVenue() {
@@ -442,37 +575,40 @@ async function saveVenue() {
   const phone = document.getElementById('venue-phone').value.trim();
   const note = document.getElementById('venue-note').value.trim();
   const editId = document.getElementById('venue-edit-id').value;
-  if (!name) { showToast('⚠️ 기관명을 입력해주세요'); return; }
-  if (editId) {
-    await sb.from('exam_venues').update({ name, address, zipcode, manager, phone, note }).eq('id', editId);
-    document.getElementById('venue-edit-id').value = '';
-    document.getElementById('venue-form-title').textContent = '시험장 추가';
-  } else {
-    await sb.from('exam_venues').insert({ user_id: currentUser.id, name, address, zipcode, manager, phone, note });
-  }
-  ['venue-name','venue-address','venue-zipcode','venue-manager','venue-phone','venue-note'].forEach(id => document.getElementById(id).value = '');
+  if (!name) { showToast('⚠️ 기관명을 입력해주세요'); document.getElementById('venue-name').focus(); return; }
+  let error = null;
+  if (editId) ({ error } = await sb.from('exam_venues').update({ name, address, zipcode, manager, phone, note }).eq('id', editId));
+  else ({ error } = await sb.from('exam_venues').insert({ user_id: currentUser.id, name, address, zipcode, manager, phone, note }));
+  if (error) { showToast('⚠️ 저장하지 못했어요. 다시 시도해 주세요'); return; }
+  resetVenueForm();
+  if (editId) toggleVenueForm(false);                         // 수정을 마치면 폼을 접고, 연달아 추가할 때는 열어둠
+  else document.getElementById('venue-name').focus({ preventScroll: true });
   showToast('✅ 저장됐어요!');
-  loadVenueList(); loadVenues();
+  await loadVenueList(); loadVenues();
 }
 
-async function editVenue(id) {
+function editVenue(id) {
   const v = venues.find(v => v.id === id); if (!v) return;
+  toggleVenueForm(true);
   document.getElementById('venue-edit-id').value = v.id;
-  document.getElementById('venue-name').value = v.name;
+  document.getElementById('venue-name').value = v.name || '';
   document.getElementById('venue-address').value = v.address || '';
   document.getElementById('venue-zipcode').value = v.zipcode || '';
   document.getElementById('venue-manager').value = v.manager || '';
   document.getElementById('venue-phone').value = v.phone || '';
   document.getElementById('venue-note').value = v.note || '';
   document.getElementById('venue-form-title').textContent = '시험장 수정';
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  document.getElementById('venue-form-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  document.getElementById('venue-name').focus({ preventScroll: true });
 }
 
 async function deleteVenue(id) {
-  if (!confirm('삭제할까요?')) return;
-  await sb.from('exam_venues').delete().eq('id', id);
+  const v = venues.find(v => v.id === id);
+  if (!confirm(`'${v ? v.name : ''}' 시험장을 삭제할까요?`)) return;
+  const { error } = await sb.from('exam_venues').delete().eq('id', id);
+  if (error) { showToast('⚠️ 삭제하지 못했어요'); return; }
   showToast('🗑 삭제됐어요');
-  loadVenueList(); loadVenues();
+  await loadVenueList(); loadVenues();
 }
 
 async function loadDeliveryHistory() {

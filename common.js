@@ -431,7 +431,7 @@ async function qaSubmit() {
 }
 
 // ===== 통합 검색 (Ctrl K) =====
-const SEARCH_KINDS = ['todo', 'complaint', 'worklog', 'notice', 'bookmark', 'file'];
+const SEARCH_KINDS = ['todo', 'complaint', 'worklog', 'notice', 'bookmark', 'file', 'venue'];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 function safeHttp(u) { try { const x = new URL(u); return x.protocol === 'http:' || x.protocol === 'https:'; } catch (e) { return false; } }
 const KIND_INFO = {
@@ -440,7 +440,8 @@ const KIND_INFO = {
   worklog:   { label: '업무 일지', icon: 'log',      url: () => 'worklog.html' },
   notice:    { label: '공지사항',  icon: 'notice',   url: () => 'notice.html' },
   bookmark:  { label: '북마크',    icon: 'bookmark', url: r => (safeHttp(r.snippet) ? r.snippet : 'bookmark.html') },
-  file:      { label: '자료실',    icon: 'folder',   url: () => 'index.html' }
+  file:      { label: '자료실',    icon: 'folder',   url: () => 'index.html' },
+  venue:     { label: '시험장',    icon: 'building', url: r => 'delivery.html?tab=venues&q=' + encodeURIComponent(String(r.title || '').slice(0, 60)) }
 };
 const _s = { items: [], active: 0, seq: 0, timer: null, loading: false, error: false, remote: [] };
 
@@ -478,7 +479,7 @@ function searchBuild() {
     .slice(0, 8)
     .map(r => {
       const info = KIND_INFO[k];
-      const parts = k === 'bookmark' || k === 'file' ? [r.snippet] : [r.ref_date !== r.title ? r.ref_date : '', r.snippet];
+      const parts = k === 'bookmark' || k === 'file' || k === 'venue' ? [r.snippet] : [r.ref_date !== r.title ? r.ref_date : '', r.snippet];
       const url = info.url(r);
       const ext = k === 'bookmark' && safeHttp(r.snippet);
       return {
