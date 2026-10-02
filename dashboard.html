@@ -82,6 +82,17 @@
 [data-theme="dark"] .tool-notion{--tc:#e6edf3;}   [data-theme="light"] .tool-notion{--tc:#1f2328;}
 .tool-icqa{--tc:var(--purple);}
 
+/* 다가오는 시험 */
+.exam-mini{display:block;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.8rem .9rem;margin-bottom:.6rem;text-decoration:none;color:inherit;}
+.exam-mini:last-child{margin-bottom:0;}
+.exam-mini:hover{border-color:var(--accent);}
+.em-top{display:flex;align-items:baseline;justify-content:space-between;gap:.6rem;}
+.em-dd{font-size:1.5rem;font-weight:700;line-height:1.2;}
+.em-date{font-size:.76rem;color:var(--text-muted);}
+.em-title{font-size:.86rem;font-weight:600;margin:.2rem 0 .6rem;line-height:1.5;}
+.em-prog{display:flex;align-items:center;gap:.6rem;}
+.em-prog .progress-bar{flex:1;margin:0;height:6px;border-radius:3px;}
+.em-prog span{font-size:.74rem;color:var(--text-muted);font-variant-numeric:tabular-nums;}
 .link-btn{background:none;border:none;color:var(--accent);font-family:inherit;font-size:.8rem;cursor:pointer;padding:.5rem 0;min-height:44px;min-width:44px;white-space:nowrap;}
 .panel-head .link-btn{text-align:right;}
 .link-btn:hover{text-decoration:underline;}
@@ -244,10 +255,15 @@
         </div>
       </div>
 
-      <aside class="dash-side" aria-label="오늘 일정과 나의 기준">
+      <aside class="dash-side" aria-label="오늘 일정, 다가오는 시험, 나의 기준">
         <section class="panel" aria-labelledby="h-cal">
           <div class="panel-head"><h2 id="h-cal">오늘 일정</h2><span class="panel-note">Google 캘린더</span></div>
           <div id="dash-cal"><div class="empty">불러오는 중...</div></div>
+        </section>
+
+        <section class="panel" aria-labelledby="h-exam">
+          <div class="panel-head"><h2 id="h-exam">다가오는 시험</h2><a class="panel-link" href="exam.html">시험 회차</a></div>
+          <div id="dash-exams"><div class="empty">불러오는 중...</div></div>
         </section>
 
         <!-- 나의 기준: 내용은 코드가 아니라 비공개 DB(pinned_notes)에서 불러옴 -->
@@ -507,6 +523,33 @@ async function loadDashCalendar(now) {
 }
 
 // ---------- 시작 ----------
+// ---------- 다가오는 시험 (시험 회차) ----------
+async function loadExams() {
+  const el = document.getElementById('dash-exams'); if (!el) return;
+  try {
+    const r = await sb.from('exam_schedules').select('*').eq('user_id', currentUser.id).eq('status', 'active');
+    if (r.error) throw r.error;
+    const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+    const eff = x => { const nx = examNext(x, today0); return nx ? nx.date : '9999-12-31'; };            // 다음 시험일(지났으면 마지막 시험일) 기준으로 정렬
+    const list = (r.data || []).slice().sort((a, b) => eff(a).localeCompare(eff(b))).slice(0, 2);
+    if (!list.length) { el.innerHTML = '<div class="rule-empty">진행중인 회차가 없어요. <a class="panel-link" href="exam.html">회차 만들기</a></div>'; return; }
+    const it = await sb.from('exam_items').select('exam_id, done').in('exam_id', list.map(x => x.id));
+    const cnt = {}; (it.data || []).forEach(i => { (cnt[i.exam_id] = cnt[i.exam_id] || { d: 0, t: 0 }); cnt[i.exam_id].t++; if (i.done) cnt[i.exam_id].d++; });
+    const DOWK = ['일', '월', '화', '수', '목', '금', '토'];
+    el.innerHTML = list.map(x => {
+      const c = cnt[x.id] || { d: 0, t: 0 }, pct = c.t ? Math.round(c.d / c.t * 100) : 0;
+      const nx = examNext(x, today0), dd = nx ? nx.dd : null, pre = nx && nx.distinct > 1 && nx.kinds.length ? nx.kinds.join('·') + ' ' : '';
+      const color = dd === null ? 'var(--text-muted)' : dd < 0 ? 'var(--warning)' : dd <= 7 ? 'var(--danger)' : 'var(--accent)';
+      const d = nx ? parseLocalDate(nx.date) : null;
+      return `<a class="exam-mini" href="exam.html?open=${encodeURIComponent(x.id)}">
+        <div class="em-top"><span class="em-dd" style="color:${color}">${escHtml(examDdLabel(nx)) || '미정'}</span><span class="em-date">${d ? `${escHtml(pre)}${d.getMonth() + 1}월 ${d.getDate()}일 (${DOWK[d.getDay()]})` : '시험일 미정'}</span></div>
+        <div class="em-title">${escHtml(x.title)}</div>
+        <div class="em-prog"><div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div><span>${c.d}/${c.t}</span></div>
+      </a>`;
+    }).join('');
+  } catch (e) { el.innerHTML = '<div class="rule-empty">시험 회차를 불러오지 못했어요. (07번 SQL을 실행했는지 확인해 주세요)</div>'; }
+}
+
 // ---------- 나의 기준 (비공개 메모: pinned_notes 테이블) ----------
 const RULE_SLUG = 'my-rules';
 const _rule = { text: '', loaded: false, error: false, loading: false, open: false };
@@ -668,6 +711,7 @@ async function initDashboard() {
   renderTools();
   renderRule();
   loadRule();
+  loadExams();
   const days = ['일', '월', '화', '수', '목', '금', '토'];
   document.getElementById('dash-date').textContent = `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일 ${days[now.getDay()]}요일`;
   applyGreeting(now);

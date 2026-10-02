@@ -228,6 +228,9 @@ const ICON = {
   star4: '<path d="M12 3c.6 4.8 4.2 8.4 9 9-4.8.6-8.4 4.2-9 9-.6-4.8-4.2-8.4-9-9 4.8-.6 8.4-4.2 9-9z"/>',
   asterisk: '<path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9"/>',
   ext: '<path d="M7 17 17 7"/><path d="M8 7h9v9"/>',
+  calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  chevL: '<path d="m15 18-6-6 6-6"/>',
+  chevR: '<path d="m9 18 6-6-6-6"/>',
   building: '<path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/><path d="M9 11h.01M15 11h.01"/>',
   sunrise: '<path d="M12 2v8"/><path d="m4.93 10.93 1.41 1.41"/><path d="M2 18h2"/><path d="M20 18h2"/><path d="m19.07 10.93-1.41 1.41"/><path d="M22 22H2"/><path d="m8 6 4-4 4 4"/><path d="M16 18a4 4 0 0 0-8 0"/>',
   sunset: '<path d="M12 10V2"/><path d="m4.93 10.93 1.41 1.41"/><path d="M2 18h2"/><path d="M20 18h2"/><path d="m19.07 10.93-1.41 1.41"/><path d="M22 22H2"/><path d="m16 6-4 4-4-4"/><path d="M16 18a4 4 0 0 0-8 0"/>',
@@ -251,6 +254,7 @@ const MENU = [
   { href: 'dashboard.html',         icon: 'home',     label: '홈',            group: '업무' },
   { href: 'todo.html',              icon: 'todo',     label: '할일',          group: '업무' },
   { href: 'project.html',           icon: 'project',  label: '장기프로젝트',  short: '프로젝트', group: '업무' },
+  { href: 'exam.html',              icon: 'calendar', label: '시험 회차',     group: '업무' },
   { href: 'index.html',             icon: 'folder',   label: '자료실',        group: '자료' },
   { href: 'upload.html',            icon: 'upload',   label: '업로드',        group: '자료', admin: true },
   { href: 'delivery.html',          icon: 'box',      label: '택배 발송',     group: '자료', admin: true },
@@ -772,6 +776,28 @@ async function wkTest() {
   if (!inf.leaveAt) inf.leaveAt = atTime(now, '17:00');
   await leaveNotify(inf, now, true);
 }
+
+// ===== 시험 회차 공통 (필기 / 실기) =====
+const EXAM_KINDS = ['필기', '실기'];
+function ymdToDate(str) { const [y, m, d] = String(str).slice(0, 10).split('-').map(Number); return new Date(y, (m || 1) - 1, d || 1); }
+// 회차의 시험일 목록 [{ kind, date }] — 날짜순. 구분별 날짜가 없으면 예전 방식(exam_date 하나)으로 처리
+function examDates(r) {
+  const out = [], kd = r && r.kind_dates && typeof r.kind_dates === 'object' ? r.kind_dates : {};
+  EXAM_KINDS.forEach(k => { if (kd[k]) out.push({ kind: k, date: String(kd[k]).slice(0, 10) }); });
+  if (!out.length && r && r.exam_date) out.push({ kind: '', date: String(r.exam_date).slice(0, 10) });
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+// 가장 가까운 앞으로의 시험 (모두 지났으면 가장 최근에 지난 시험)
+function examNext(r, today) {
+  const list = examDates(r); if (!list.length) return null;
+  const n = new Date(), t0 = today || new Date(n.getFullYear(), n.getMonth(), n.getDate());
+  const w = list.map(x => ({ kind: x.kind, date: x.date, dd: Math.round((ymdToDate(x.date) - t0) / 86400000) }));
+  const up = w.filter(x => x.dd >= 0), pick = up.length ? up[0] : w[w.length - 1];
+  return Object.assign({}, pick, { kinds: w.filter(x => x.date === pick.date).map(x => x.kind).filter(Boolean), distinct: new Set(w.map(x => x.date)).size });
+}
+function ddText(dd) { return dd === null || dd === undefined ? '' : dd === 0 ? 'D-Day' : dd > 0 ? `D-${dd}` : `D+${-dd}`; }
+// 'D-3' 앞에 구분을 붙임: 시험일이 둘 이상 다를 때만 (예: '필기 D-3')
+function examDdLabel(nx) { return nx ? ((nx.distinct > 1 && nx.kinds.length ? nx.kinds.join('·') + ' ' : '') + ddText(nx.dd)) : ''; }
 
 // ===== 단축키 =====
 function shellReady() { return !!currentUser && !!currentRole && currentRole !== 'pending' && !document.body.classList.contains('auth-mode'); }
